@@ -5,14 +5,14 @@ import (
 	"net"
 	"encoding/gob"
 	"log"
-	
+	"server/tools/cache"
 )
 
 type server struct {
 	port string
 	socket net.Listener
 	connections map[string] net.Conn
-	storage map[string] []byte  // TODO: replace by type Storage, which will be implemented in core.storage
+	storage *cache.LRUCache
 }
 
 func (server *server) run() {
@@ -76,11 +76,11 @@ func (server *server) makeResponse(connection net.Conn, response_message string)
 	}
 }
 
-func RunServer(port string) *server {
+func RunServer(port string, memory int64) *server {
 	_server := new(server)
 	_server.socket = nil
 	_server.port = port
-	_server.storage = make(map[string] []byte) // TODO: replace by Storage initialization
+	_server.storage = cache.New(memory)
 	_server.connections = make(map[string] net.Conn)
 	go _server.run()
 	return _server

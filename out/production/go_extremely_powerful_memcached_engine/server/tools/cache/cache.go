@@ -4,18 +4,52 @@ import (
 	"container/list"
 )
 
+type Cacheable interface {
+	Key() string
+	Size() int //bytes
+}
+
+type LRUCache struct {
+	capacity int64 // bytes
+	items map[string] *LRUCacheItem
+	list *list.List
+}
+
+func (c *LRUCache) promote(item *LRUCacheItem) {
+	c.list.MoveToFront(item.listElement)
+}
+
+func (c *LRUCache) prune() {
+	for i := 0; i < 50; i++ {
+		tail := c.list.Back()
+		if tail == nil { return }
+		item := c.list.Remove(tail).(*LRUCacheItem)
+		delete(c.items, item.cacheable.Key())
+		c.capacity += int64(item.cacheable.Size())
+	}
+}
+
+type LRUCacheItem struct {
+	cacheable Cacheable
+	listElement *list.Element
+}
+
 func (c *LRUCache) Get(key string) Cacheable {
 	item, exists := c.items[key]
-	if exists == false { return nil }
+	if exists == false {
+		return nil
+	}
 	c.promote(item)
 	return item.cacheable
 }
 
 func (c *LRUCache) Set(cacheable Cacheable) bool {
-	if c.capacity < cacheable.Size() { c.prune() }
+	if c.capacity < int64(cacheable.Size()) {
+		c.prune()
+	}
 
 	//stil not enough room, fail
-	if c.capacity < cacheable.Size() { return false }
+	if c.capacity < int64(cacheable.Size()) { return false }
 
 	item, exists := c.items[cacheable.Key()]
 	if exists {
@@ -25,15 +59,15 @@ func (c *LRUCache) Set(cacheable Cacheable) bool {
 		item = &LRUCacheItem{cacheable: cacheable,}
 		item.listElement = c.list.PushFront(item)
 		c.items[cacheable.Key()] = item
-		c.capacity -= cacheable.Size()
+		c.capacity -= int64(cacheable.Size())
 	}
 	return true
 }
 
-func New(capacity int) *LRUCache {
+func New(capacity int64 /* bytes */) *LRUCache {
 	return &LRUCache{
 		capacity: capacity,
-		items: make(map[string]*LRUCacheItem, 10000),
+		items: make(map[string] *LRUCacheItem, 10000),
 		list: list.New(),
 	}
 }

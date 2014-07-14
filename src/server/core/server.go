@@ -12,7 +12,7 @@ type server struct {
 	port string
 	socket net.Listener
 	connections map[string] net.Conn
-	storage *cache.LRUCache  // TODO: replace by type Storage, which will be implemented in core.storage
+	storage *cache.LRUCache
 }
 
 func (server *server) run() {
@@ -23,7 +23,6 @@ func (server *server) run() {
 	}
 	server.socket = listener
 	for {
-		// accept a connection
 		// Accept waits for and returns the next connection to the listener.
 		connection, err := listener.Accept()
 
@@ -33,7 +32,7 @@ func (server *server) run() {
 		}
 		// handle the connection
 		server.connections[connection.LocalAddr().String()] = connection
-		go server.dispatch(connection)  // may be it has sense to use pointers for optimization of process.
+		go server.dispatch(connection)
 	}
 }
 
@@ -49,7 +48,6 @@ func (server *server) stop() {
 }
 
 func (server *server) dispatch(connection net.Conn) {
-	defer server.breakConnection(connection)
 	var received_message string
 	err := gob.NewDecoder(connection).Decode(&received_message)
 	if err != nil {
@@ -76,11 +74,11 @@ func (server *server) makeResponse(connection net.Conn, response_message string)
 	}
 }
 
-func RunServer(port string) *server {
+func RunServer(port string, memory int64) *server {
 	_server := new(server)
 	_server.socket = nil
 	_server.port = port
-	_server.storage = cache.New(/**/)
+	_server.storage = cache.New(memory)
 	_server.connections = make(map[string] net.Conn)
 	go _server.run()
 	return _server
@@ -88,5 +86,5 @@ func RunServer(port string) *server {
 
 func StopServer(server *server) {
 	server.stop()
-	fmt.Println("Server is stoped.")
+	fmt.Println("Server is stopped.")
 }

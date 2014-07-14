@@ -30,6 +30,7 @@ func Client(port string, message string) {
 	}
 	var received_message string
 	err = gob.NewDecoder(c).Decode(&received_message)
+	c.Close()
 	if err != nil {
 		fmt.Println(err)
 	} else {
