@@ -31,6 +31,9 @@ func (c *LRUCache) prune() {
 
 type LRUCacheItem struct {
 	cacheable Cacheable
+	flags int
+	exptime int
+	cas_unique int64
 	listElement *list.Element
 }
 
@@ -48,7 +51,7 @@ func (c *LRUCache) Set(cacheable Cacheable) bool {
 		c.prune()
 	}
 
-	//stil not enough room, fail
+	//still not enough room, fail
 	if c.capacity < int64(cacheable.Size()) { return false }
 
 	item, exists := c.items[cacheable.Key()]
@@ -62,6 +65,14 @@ func (c *LRUCache) Set(cacheable Cacheable) bool {
 		c.capacity -= int64(cacheable.Size())
 	}
 	return true
+}
+
+func (c *LRUCache) Flush(cacheable Cacheable) bool {
+	_, exists := c.items[cacheable.Key()]
+	if exists {
+		delete(c.items, cacheable.Key())
+		return true
+	} else { return false }
 }
 
 func New(capacity int64 /* bytes */) *LRUCache {

@@ -3,9 +3,13 @@ package core
 import (
 	"fmt"
 	"net"
-	"encoding/gob"
 	"log"
 	"server/tools/cache"
+	"server/tools/protocol"
+)
+
+const (
+	MAX_KEY_LENGTH = 250
 )
 
 type server struct {
@@ -21,18 +25,22 @@ func (server *server) run() {
 		fmt.Println(err)
 		return
 	}
+	//var received_message []byte
 	server.socket = listener
 	for {
 		// Accept waits for and returns the next connection to the listener.
+		fmt.Println("Waiting for connection...")
 		connection, err := listener.Accept()
-
+		fmt.Println("Accepted!")
 		if err != nil {
 			fmt.Println(err) // TODO: replace by kind of traceback
 			continue
 		}
 		// handle the connection
-		server.connections[connection.LocalAddr().String()] = connection
-		go server.dispatch(connection)
+
+		server.connections[connection.RemoteAddr().String()] = connection
+		go server.dispatch(connection.RemoteAddr().String())
+
 	}
 }
 
@@ -45,32 +53,40 @@ func (server *server) stop() {
 	} else {
 		log.Fatal("Server can't be stoped, because socket is undefined.")
 	}
+
 }
 
-func (server *server) dispatch(connection net.Conn) {
-	var received_message string
-	err := gob.NewDecoder(connection).Decode(&received_message)
+func (server *server) dispatch(address string) {
+	received_message := make([]byte, MAX_KEY_LENGTH)
+	fmt.Println("Retrieving connection's data from ", address)
+	connection := server.connections[address]
+	n, err := connection.Read(received_message[0 : ])
+	fmt.Println("Done!")
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("Dispatching error: ", err, " Message: ", received_message)
+		server.makeResponse(connection, []byte("ERROR\r\n"), 5)
 	} else {
 		// here message should be dispatched
-		fmt.Println("Server has received a message: ", received_message)
-		server.makeResponse(connection, "Your message '" + received_message + "' was received.")
+		fmt.Println("Server has received a message: ", string(received_message[0 : n]))
+		some := protocol.ParseProtocolHeaders(string(received_message))
+		fmt.Println(some)
+		server.makeResponse(connection, []byte("OK\r\n"), 2)
 	}
 }
 
-func (server *server) breakConnection(connection net.Conn) {
-	delete(server.connections, connection.LocalAddr().String())
+func (server *server) breakConnection(con *net.Conn) {
+	connection := *con
+	delete(server.connections, connection.RemoteAddr().String())
 	err := connection.Close()
 	if err != nil {
 		fmt.Println(err)
 	}
 }
 
-func (server *server) makeResponse(connection net.Conn, response_message string) {
-	err := gob.NewEncoder(connection).Encode(response_message)
+func (server *server) makeResponse(connection net.Conn, response_message []byte, length int) {
+	length, err := connection.Write(response_message[0 : length])
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("Error was occured during making response:", err)
 	}
 }
 

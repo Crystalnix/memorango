@@ -13,7 +13,7 @@ import (
 	"encoding/gob"
 )
 
-func Client(port string, message string) {
+func Client(port string, message []byte) {
 	// connect to the server
 	c, err := net.Dial("tcp", "127.0.0.1:" + port)
 	defer c.Close()
@@ -25,14 +25,16 @@ func Client(port string, message string) {
 	// send the message
 	fmt.Println("Client has sent a message: ", message)
 	err = gob.NewEncoder(c).Encode(message)
+
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("Error was occured during data transmission:", err)
 	}
-	var received_message string
+	var received_message []byte
 	err = gob.NewDecoder(c).Decode(&received_message)
+	c.Close()
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("Error was occured during receiving of data:", err)
 	} else {
-		fmt.Println("Server response: ", received_message)
+		fmt.Println("Server response: ", string(received_message))
 	}
 }

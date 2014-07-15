@@ -31,6 +31,9 @@ func (c *LRUCache) prune() {
 
 type LRUCacheItem struct {
 	cacheable Cacheable
+	flags int
+	exptime int
+	cas_unique int64
 	listElement *list.Element
 }
 

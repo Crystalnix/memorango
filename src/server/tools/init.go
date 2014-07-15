@@ -1,20 +1,20 @@
 package tools
 
-import "unsafe"
+import "strconv"
 
 //type for implementation of Cacheable interface
-type RawByteString struct {
+type StoredData struct {
 	value []byte
 	key string
 }
 
 // Following function implements interface Key() and returns key of the value
-func (container *RawByteString) Key() string {
+func (container *StoredData) Key() string {
 	return container.key
 }
 
 // Following function implements interface Size() and returns amount of bytes
-func (container *RawByteString) Size() int {
+func (container *StoredData) Size() int {
 	return len(container.value)
 }
 
@@ -24,8 +24,13 @@ type Protocol interface {
 }
 
 func In(element string, collection []string) bool{
-	for index, value := range collection {
+	for _, value := range collection {
 		if element == value { return true }
 	}
 	return false
+}
+
+func StringToInt32(str string) (int, error) {
+	value, err := strconv.ParseInt(str, 10, 32)
+	return int(value), err
 }
