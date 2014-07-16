@@ -8,9 +8,9 @@ import (
 )
 
 const (
-	error_temp = "ERROR\r\n"
-	client_error_temp = "CLIENT_ERROR %s\r\n"
-	server_error_temp = "SERVER_ERROR %s\r\n"
+	ERROR_TEMP = "ERROR\r\n"
+	CLIENT_ERROR_TEMP = "CLIENT_ERROR %s\r\n"
+	SERVER_ERROR_TEMP = "SERVER_ERROR %s\r\n"
 )
 
 var storage_commands = []string{"set", "add", "replace", "append", "prepend", "cas",}
@@ -42,17 +42,17 @@ func ParseProtocolHeaders(request string) *Ascii_protocol_enum{
 		case tools.In(command, other_commands):
 			return parseOtherCommands(command_line)
 		default:
-			return &Ascii_protocol_enum{error: error_temp}
+			return &Ascii_protocol_enum{error: ERROR_TEMP}
 		}
 	} else {
-		return &Ascii_protocol_enum{error: strings.Replace(client_error_temp, "%s", "Input command line is empty", 1)}
+		return &Ascii_protocol_enum{error: strings.Replace(CLIENT_ERROR_TEMP, "%s", "Input command line is empty", 1)}
 	}
 }
 
 func parseStorageCommands(args []string, data_block string) *Ascii_protocol_enum{
 	protocol := new(Ascii_protocol_enum)
 	if len(args) < 5 || len(data_block) == 0 || tools.In("", args) {
-		return &Ascii_protocol_enum{error: error_temp}
+		return &Ascii_protocol_enum{error: ERROR_TEMP}
 	}
 	var err error
 	protocol.command = args[0]
@@ -74,7 +74,7 @@ func parseStorageCommands(args []string, data_block string) *Ascii_protocol_enum
 		}
 	}
 	if err != nil {
-		return &Ascii_protocol_enum{error: error_temp}
+		return &Ascii_protocol_enum{error: ERROR_TEMP}
 	}
 	return protocol
 }
@@ -82,7 +82,7 @@ func parseStorageCommands(args []string, data_block string) *Ascii_protocol_enum
 func parseRetrieveCommands(args []string) *Ascii_protocol_enum {
 	protocol := new(Ascii_protocol_enum)
 	if len(args) < 2 || tools.In("", args) {
-		return &Ascii_protocol_enum{error: error_temp}
+		return &Ascii_protocol_enum{error: ERROR_TEMP}
 	}
 	protocol.command = args[0]
 	if args[len(args) - 1] != "noreply" {
@@ -120,8 +120,9 @@ func parseOtherCommands(args []string) *Ascii_protocol_enum {
 		}
 	}
 	if err != nil {
-		return &Ascii_protocol_enum{error: error_temp}
+		return &Ascii_protocol_enum{error: ERROR_TEMP}
 	}
 	return protocol
 }
+
 

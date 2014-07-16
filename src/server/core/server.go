@@ -68,14 +68,21 @@ func (server *server) dispatch(address string) {
 	} else {
 		// here message should be dispatched
 		fmt.Println("Server has received a message: ", string(received_message[0 : n]))
-		some := protocol.ParseProtocolHeaders(string(received_message))
-		fmt.Println(some)
-		server.makeResponse(connection, []byte("OK\r\n"), 2)
+		parsed_request := protocol.ParseProtocolHeaders(string(received_message))
+		// handle some
+		response_message, _:= parsed_request.HandleRequest(server.storage)
+		fmt.Println("Server is sending response: ", string(response_message[0 : len(response_message)]))
+		if parsed_request.Reply() {
+			server.makeResponse(connection, response_message, len(response_message))
+		}
+		if err != nil {
+			server.breakConnection(connection)
+		}
+
 	}
 }
 
-func (server *server) breakConnection(con *net.Conn) {
-	connection := *con
+func (server *server) breakConnection(connection net.Conn) {
 	delete(server.connections, connection.RemoteAddr().String())
 	err := connection.Close()
 	if err != nil {
@@ -88,16 +95,18 @@ func (server *server) makeResponse(connection net.Conn, response_message []byte,
 	if err != nil {
 		fmt.Println("Error was occured during making response:", err)
 	}
+	fmt.Println("Sent!")
+	return
 }
 
 func RunServer(port string, memory int64) *server {
-	_server := new(server)
-	_server.socket = nil
-	_server.port = port
-	_server.storage = cache.New(memory)
-	_server.connections = make(map[string] net.Conn)
-	go _server.run()
-	return _server
+	server := new(server)
+	server.socket = nil
+	server.port = port
+	server.storage = cache.New(memory)
+	server.connections = make(map[string] net.Conn)
+	go server.run()
+	return server
 }
 
 func StopServer(server *server) {
