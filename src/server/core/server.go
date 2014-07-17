@@ -6,6 +6,7 @@ import (
 	"log"
 	"server/tools/cache"
 	"server/tools/protocol"
+	"io"
 )
 
 const (
@@ -57,28 +58,37 @@ func (server *server) stop() {
 }
 
 func (server *server) dispatch(address string) {
-	received_message := make([]byte, MAX_KEY_LENGTH)
+
 	fmt.Println("Retrieving connection's data from ", address)
 	connection := server.connections[address]
-	n, err := connection.Read(received_message[0 : ])
-	fmt.Println("Done!")
-	if err != nil {
-		fmt.Println("Dispatching error: ", err, " Message: ", received_message)
-		server.makeResponse(connection, []byte("ERROR\r\n"), 5)
-	} else {
-		// here message should be dispatched
-		fmt.Println("Server has received a message: ", string(received_message[0 : n]))
-		parsed_request := protocol.ParseProtocolHeaders(string(received_message))
-		// handle some
-		response_message, _:= parsed_request.HandleRequest(server.storage)
-		fmt.Println("Server is sending response: ", string(response_message[0 : len(response_message)]))
-		if parsed_request.Reply() {
-			server.makeResponse(connection, response_message, len(response_message))
-		}
+	for { // let's loop the process for open connection, until it will get closed.
+		received_message := make([]byte, MAX_KEY_LENGTH)
+		n, err := connection.Read(received_message[0 : ])
+		fmt.Println("Connection stream was read.")
 		if err != nil {
-			server.breakConnection(connection)
-		}
+			if err == io.EOF {
+				fmt.Println("Connection is closed.")
+				server.breakConnection(connection)
+				break
 
+			}
+			fmt.Println("Dispatching error: ", err, " Message: ", received_message)
+			server.makeResponse(connection, []byte("ERROR\r\n"), 5)
+		} else {
+			// here message should be dispatched
+			fmt.Println("Server has received a message: ", string(received_message[0 : n]))
+			parsed_request := protocol.ParseProtocolHeaders(string(received_message))
+			// handle some
+			response_message, err := parsed_request.HandleRequest(server.storage)
+			fmt.Println("Server is sending response:\n", string(response_message[0 : len(response_message)]))
+			if parsed_request.Reply() {
+				server.makeResponse(connection, response_message, len(response_message))
+			}
+			if err != nil {
+				server.breakConnection(connection)
+				break
+			}
+		}
 	}
 }
 

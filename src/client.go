@@ -17,7 +17,11 @@ func main() {
 	if !mc.Set(tools.NewStoredData([]byte("This is a value"), "KEY")) {
 		fmt.Println("Cache couldn't store data.")
 		return
-	}else{ fmt.Println(string(tools.ExtractStoredData(mc.Get("KEY")))) }
+	}else{
+		x := mc.Get("KEY")
+		y := x.Cacheable
+		fmt.Println("Stored value='",string(tools.ExtractStoredData(y)),"'")
+	}
 
 	var input string
 	fmt.Scanln(&input)

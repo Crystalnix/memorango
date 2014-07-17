@@ -47,7 +47,8 @@ func IntToString(num int64) string {
 
 func ExtractStoredData(object interface {}) []byte {
 	if reflect.TypeOf(object) == reflect.TypeOf(StoredData{}){
-		if val, ok := object.(StoredData); ok {
+		val, ok := object.(StoredData)
+		if ok {
 			return val.Value()
 		}
 		return nil

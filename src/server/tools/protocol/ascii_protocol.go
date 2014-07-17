@@ -55,6 +55,7 @@ func parseStorageCommands(args []string, data_block string) *Ascii_protocol_enum
 		return &Ascii_protocol_enum{error: ERROR_TEMP}
 	}
 	var err error
+	protocol.data_string = []byte(data_block)
 	protocol.command = args[0]
 	protocol.key = []string{args[1],}
 	protocol.flags, err = tools.StringToInt32(args[2])

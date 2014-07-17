@@ -1,23 +1,23 @@
 package protocol
 
 import (
-	"server/tools/cache"
 	"server/tools"
 	"strings"
 	"strconv"
+	"errors"
 )
 
 const (
-	error_temp = "ERROR\r\n"
-	client_error_temp = "CLIENT_ERROR %s\r\n"
-	server_error_temp = "SERVER_ERROR %s\r\n"
+	ERROR_TEMP = "ERROR\r\n"
+	CLIENT_ERROR_TEMP = "CLIENT_ERROR %s\r\n"
+	SERVER_ERROR_TEMP = "SERVER_ERROR %s\r\n"
 )
 
 var storage_commands = []string{"set", "add", "replace", "append", "prepend", "cas",}
 var retrieve_commands = []string{"get", "gets",}
 var other_commands = []string{"delete", "touch", "flush_all", "version", "quite",}
 
-type ascii_protocol_enum struct {
+type Ascii_protocol_enum struct {
 	command string		// the main action of the passed request.
 	key []string		// key or keys for requested items.
 	flags int 			// 32 or 16 bit int that server stores along with the data and sends back when the item is retrieved.
@@ -29,12 +29,7 @@ type ascii_protocol_enum struct {
 	error string		// error, which appears when something goes wrong, normally is empty string ""
 }
 
-func (p *ascii_protocol_enum) Set(instance_ptr *cache.LRUCache) string {
-	//...
-	return ""
-}
-
-func InitProtocol(request string) *ascii_protocol_enum{
+func ParseProtocolHeaders(request string) *Ascii_protocol_enum{
 	parsed_req := strings.Split(request, "\r\n")
 	if len(parsed_req[0]) > 0 {
 		command_line := strings.Split(parsed_req[0], " ")
@@ -47,29 +42,30 @@ func InitProtocol(request string) *ascii_protocol_enum{
 		case tools.In(command, other_commands):
 			return parseOtherCommands(command_line)
 		default:
-			return &ascii_protocol_enum{error: error_temp}
+			return &Ascii_protocol_enum{error: ERROR_TEMP}
 		}
 	} else {
-		return &ascii_protocol_enum{error: strings.Replace(client_error_temp, "%s", "Input command line is empty", 1)}
+		return &Ascii_protocol_enum{error: strings.Replace(CLIENT_ERROR_TEMP, "%s", "Input command line is empty", 1)}
 	}
 }
 
-func parseStorageCommands(args []string, data_block string) *ascii_protocol_enum{
-	protocol := new(ascii_protocol_enum)
+func parseStorageCommands(args []string, data_block string) *Ascii_protocol_enum{
+	protocol := new(Ascii_protocol_enum)
 	if len(args) < 5 || len(data_block) == 0 || tools.In("", args) {
-		return &ascii_protocol_enum{error: error_temp}
+		return &Ascii_protocol_enum{error: ERROR_TEMP}
 	}
 	var err error
+	protocol.data_string = []byte(data_block)
 	protocol.command = args[0]
 	protocol.key = []string{args[1],}
-	protocol.flags, err = strconv.ParseInt(args[2], 10, 32)
-	protocol.exptime, err = strconv.ParseInt(args[3], 10, 32)
-	protocol.bytes, err = strconv.ParseInt(args[4], 10, 32)
+	protocol.flags, err = tools.StringToInt32(args[2])
+	protocol.exptime, err = tools.StringToInt32(args[3])
+	protocol.bytes, err = tools.StringToInt32(args[4])
 	if args[0] == "cas" {
 		if len(args) < 6 {
-			return &ascii_protocol_enum{error: error_temp}
+			err = errors.New("invalid arguments number")
 		}
-		protocol.cas_unique, err = strconv.ParseInt(args[1], 10, 64)
+		protocol.cas_unique, err = strconv.ParseInt(args[5], 10, 64)
 		if len(args) == 7 {
 			protocol.noreply = (args[6] == "noreply")
 		}
@@ -79,15 +75,15 @@ func parseStorageCommands(args []string, data_block string) *ascii_protocol_enum
 		}
 	}
 	if err != nil {
-		return &ascii_protocol_enum{error: error_temp}
+		return &Ascii_protocol_enum{error: ERROR_TEMP}
 	}
 	return protocol
 }
 
-func parseRetrieveCommands(args []string) *ascii_protocol_enum {
-	protocol := new(ascii_protocol_enum)
+func parseRetrieveCommands(args []string) *Ascii_protocol_enum {
+	protocol := new(Ascii_protocol_enum)
 	if len(args) < 2 || tools.In("", args) {
-		return &ascii_protocol_enum{error: error_temp}
+		return &Ascii_protocol_enum{error: ERROR_TEMP}
 	}
 	protocol.command = args[0]
 	if args[len(args) - 1] != "noreply" {
@@ -99,32 +95,35 @@ func parseRetrieveCommands(args []string) *ascii_protocol_enum {
 	return protocol
 }
 
-func parseOtherCommands(args []string) *ascii_protocol_enum {
-	protocol := new(ascii_protocol_enum)
+func parseOtherCommands(args []string) *Ascii_protocol_enum {
+	protocol := new(Ascii_protocol_enum)
+	var err error
+	err = nil
 	if tools.In("", args) {
-		return &ascii_protocol_enum{error: error_temp}
+		err = errors.New("invalid arguments")
 	}
 	protocol.command = args[0]
 	switch args[0]{
 	case "delete":
 		if len(args) < 2{
-			return &ascii_protocol_enum{error: error_temp}
+			err = errors.New("invalid arguments number")
 		}
 		protocol.key = []string{args[1], }
 	case "touch":
 		if len(args) < 3{
-			return &ascii_protocol_enum{error: error_temp}
+			err = errors.New("invalid arguments number")
 		}
 		protocol.key = []string{args[1], }
-		protocol.exptime, _ = strconv.ParseInt(args[2], 10, 32)
+		protocol.exptime, err = tools.StringToInt32(args[2])
 	case "flush_all":
 		if len(args) >= 2 {
-			exp_time, err := strconv.ParseInt(args[1], 10, 32)
-			if err != nil {
-				return &ascii_protocol_enum{error: error_temp}
-			}
-			protocol.exptime = int(exp_time)
+			protocol.exptime, err = tools.StringToInt32(args[1])
 		}
+	}
+	if err != nil {
+		return &Ascii_protocol_enum{error: ERROR_TEMP}
 	}
 	return protocol
 }
+
+

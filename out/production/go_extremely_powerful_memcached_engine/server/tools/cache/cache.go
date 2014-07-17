@@ -2,11 +2,12 @@ package cache
 
 import (
 	"container/list"
+	"time"
 )
 
 type Cacheable interface {
 	Key() string
-	Size() int //bytes
+	Size() int
 }
 
 type LRUCache struct {
@@ -24,53 +25,61 @@ func (c *LRUCache) prune() {
 		tail := c.list.Back()
 		if tail == nil { return }
 		item := c.list.Remove(tail).(*LRUCacheItem)
-		delete(c.items, item.cacheable.Key())
-		c.capacity += int64(item.cacheable.Size())
+		delete(c.items, item.Cacheable.Key())
+		c.capacity += int64(item.Cacheable.Size())
 	}
 }
 
 type LRUCacheItem struct {
-	cacheable Cacheable
-	flags int
-	exptime int
-	cas_unique int64
+	Cacheable Cacheable
+	Flags int
+	Exptime int
+	Cas_unique int64
 	listElement *list.Element
 }
 
-func (c *LRUCache) Get(key string) Cacheable {
+func (c *LRUCache) Get(key string) *LRUCacheItem {
 	item, exists := c.items[key]
 	if exists == false {
 		return nil
 	}
+	// Passive expiration
+	if int64(item.Exptime) < time.Now().Unix() && item.Exptime != 0 {
+		c.list.Remove(item.listElement)
+		delete(c.items, item.Cacheable.Key())
+		return nil
+	}
 	c.promote(item)
-	return item.cacheable
+	return item
 }
 
-func (c *LRUCache) Set(cacheable Cacheable) bool {
-	if c.capacity < int64(cacheable.Size()) {
+func (c *LRUCache) Set(Cacheable Cacheable) bool {
+	if c.capacity < int64(Cacheable.Size()) {
 		c.prune()
 	}
 
 	//still not enough room, fail
-	if c.capacity < int64(cacheable.Size()) { return false }
+	if c.capacity < int64(Cacheable.Size()) {
+		return false
+	}
 
-	item, exists := c.items[cacheable.Key()]
+	item, exists := c.items[Cacheable.Key()]
 	if exists {
-		item.cacheable = cacheable
+		item.Cacheable = Cacheable
 		c.promote(item)
 	} else {
-		item = &LRUCacheItem{cacheable: cacheable,}
+		item = &LRUCacheItem{Cacheable: Cacheable,}
 		item.listElement = c.list.PushFront(item)
-		c.items[cacheable.Key()] = item
-		c.capacity -= int64(cacheable.Size())
+		c.items[Cacheable.Key()] = item
+		c.capacity -= int64(Cacheable.Size())
 	}
 	return true
 }
 
-func (c *LRUCache) Flush(cacheable Cacheable) bool {
-	_, exists := c.items[cacheable.Key()]
+func (c *LRUCache) Flush(Cacheable Cacheable) bool {
+	_, exists := c.items[Cacheable.Key()]
 	if exists {
-		delete(c.items, cacheable.Key())
+		delete(c.items, Cacheable.Key())
 		return true
 	} else { return false }
 }

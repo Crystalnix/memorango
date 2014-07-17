@@ -9,6 +9,7 @@ import (
 )
 
 func (enum *Ascii_protocol_enum) HandleRequest(storage *cache.LRUCache) ([]byte, error) {
+	fmt.Println("Start handle request: ", enum)
 	var err error
 	if len(enum.error) > 0 {
 		return []byte(enum.error), nil
@@ -25,8 +26,6 @@ func (enum *Ascii_protocol_enum) HandleRequest(storage *cache.LRUCache) ([]byte,
 
 func (enum *Ascii_protocol_enum) set(storage *cache.LRUCache) (string, error){
 	ind := storage.Set(tools.NewStoredData(enum.data_string, enum.key[0]))
-	item := storage.Get(enum.key[0])
-	fmt.Println(item)
 	if ind {
 		return "STORED\r\n", nil
 	} else {
@@ -58,14 +57,12 @@ func (enum *Ascii_protocol_enum) get(storage *cache.LRUCache) (string, error) {
 	var result = ""
 	for _, value := range enum.key{
 		item := storage.Get(value)
-		fmt.Println(item)
 		if item != nil {
 			data := tools.ExtractStoredData(item.Cacheable)
 			if data == nil {
-				fmt.Println("data for key " + value +" is nill")
 				continue
 			}
-			result += "VALUE " + value + " " + tools.IntToString(int64(item.Flags))
+			result += "VALUE " + value + " " + tools.IntToString(int64(item.Flags)) + " " + tools.IntToString(int64(len(data)))
 			if item.Cas_unique != 0 {
 				result += " " + tools.IntToString(item.Cas_unique)
 			}

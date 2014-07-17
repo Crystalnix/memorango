@@ -2,7 +2,6 @@ package cache
 
 import (
 	"container/list"
-	"fmt"
 	"time"
 )
 
@@ -61,7 +60,6 @@ func (c *LRUCache) Set(Cacheable Cacheable) bool {
 
 	//still not enough room, fail
 	if c.capacity < int64(Cacheable.Size()) {
-		fmt.Printf("Capacity is about %d bytes, but item size is %d bytes (%d 64bit val)", c.capacity, Cacheable.Size(), int64(Cacheable.Size()))
 		return false
 	}
 
