@@ -21,7 +21,7 @@ type Ascii_protocol_enum struct {
 	command string		// the main action of the passed request.
 	key []string		// key or keys for requested items.
 	flags int 			// 32 or 16 bit int that server stores along with the data and sends back when the item is retrieved.
-	exptime int 		// UNIX timestamp, which guaranties, that data won't be retrieved after this time.
+	exptime int64 		// UNIX timestamp, or time from now, which guaranties, that data won't be retrieved after this time.
 	bytes int 			// the number of bytes in the data block to follow, NOT including the delimiting \r\n.
 	cas_unique int64	// unique 64-bit value of an existing entry.
 	noreply bool		// optional parameter instructs the server to not send the reply.
@@ -59,7 +59,8 @@ func parseStorageCommands(args []string, data_block string) *Ascii_protocol_enum
 	protocol.command = args[0]
 	protocol.key = []string{args[1],}
 	protocol.flags, err = tools.StringToInt32(args[2])
-	protocol.exptime, err = tools.StringToInt32(args[3])
+	protocol.exptime, err = tools.StringToInt64(args[3])
+	protocol.exptime = tools.ToTimeStampFromNow(protocol.exptime)
 	protocol.bytes, err = tools.StringToInt32(args[4])
 	if args[0] == "cas" {
 		if len(args) < 6 {
@@ -114,12 +115,13 @@ func parseOtherCommands(args []string) *Ascii_protocol_enum {
 			err = errors.New("invalid arguments number")
 		}
 		protocol.key = []string{args[1], }
-		protocol.exptime, err = tools.StringToInt32(args[2])
+		protocol.exptime, err = tools.StringToInt64(args[2])
 	case "flush_all":
 		if len(args) >= 2 {
-			protocol.exptime, err = tools.StringToInt32(args[1])
+			protocol.exptime, err = tools.StringToInt64(args[1])
 		}
 	}
+	protocol.exptime = tools.ToTimeStampFromNow(protocol.exptime)
 	if err != nil {
 		return &Ascii_protocol_enum{error: ERROR_TEMP}
 	}

@@ -3,6 +3,7 @@ package tools
 import (
 	"strconv"
 	"reflect"
+	"time"
 )
 
 //type for implementation of Cacheable interface
@@ -41,6 +42,11 @@ func StringToInt32(str string) (int, error) {
 	return int(value), err
 }
 
+func StringToInt64(str string) (int64, error) {
+	value, err := strconv.ParseInt(str, 10, 64)
+	return value, err
+}
+
 func IntToString(num int64) string {
 	return strconv.FormatInt(num, 10)
 }
@@ -54,4 +60,15 @@ func ExtractStoredData(object interface {}) []byte {
 		return nil
 	}
 	return nil
+}
+
+func isUnixTimeStamp(ts int64) bool {
+	return ts > 60 * 60 * 24 * 30 // if more than 30 days
+}
+
+func ToTimeStampFromNow(ts int64) int64 {
+	if !isUnixTimeStamp(ts) && ts != 0 {
+		ts = time.Now().Add(time.Second * time.Duration(ts)).Unix()
+	}
+	return ts
 }

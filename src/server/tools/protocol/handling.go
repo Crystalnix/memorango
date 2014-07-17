@@ -25,7 +25,7 @@ func (enum *Ascii_protocol_enum) HandleRequest(storage *cache.LRUCache) ([]byte,
 }
 
 func (enum *Ascii_protocol_enum) set(storage *cache.LRUCache) (string, error){
-	ind := storage.Set(tools.NewStoredData(enum.data_string, enum.key[0]))
+	ind := storage.Set(tools.NewStoredData(enum.data_string, enum.key[0]), enum.flags, enum.exptime, 0)
 	if ind {
 		return "STORED\r\n", nil
 	} else {

@@ -32,7 +32,6 @@ func (server *server) run() {
 		// Accept waits for and returns the next connection to the listener.
 		fmt.Println("Waiting for connection...")
 		connection, err := listener.Accept()
-		fmt.Println("Accepted!")
 		if err != nil {
 			fmt.Println(err) // TODO: replace by kind of traceback
 			continue
@@ -105,7 +104,6 @@ func (server *server) makeResponse(connection net.Conn, response_message []byte,
 	if err != nil {
 		fmt.Println("Error was occured during making response:", err)
 	}
-	fmt.Println("Sent!")
 	return
 }
 

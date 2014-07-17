@@ -15,11 +15,12 @@ func main() {
 	daemonize := flag.Bool("d", false, "Run process as background")
 
 	flag.Parse()
-	fmt.Printf("Run memcached on 127.0.0.1:%s with %d mb allocated memory.\nType 'stop' to stop the server. \n",
+	fmt.Printf("Run memcached on 127.0.0.1:%s with %d mb allocated memory.\n",
 		       *port, *memory_amount_mb)
 	_server := server.RunServer(*port, int64(*memory_amount_mb) * 1024 /* let's convert to bytes */)
 	defer server.StopServer(_server)
 	if !*daemonize {
+		fmt.Println("Type 'stop' to kill server.")
 		for {
 			var input string
 			fmt.Scanln(&input)
