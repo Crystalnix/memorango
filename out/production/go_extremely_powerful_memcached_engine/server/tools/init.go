@@ -3,7 +3,6 @@ package tools
 import (
 	"strconv"
 	"reflect"
-	"fmt"
 )
 
 //type for implementation of Cacheable interface
@@ -47,15 +46,11 @@ func IntToString(num int64) string {
 }
 
 func ExtractStoredData(object interface {}) []byte {
-	fmt.Println("Extracting ", object)
-	fmt.Println(reflect.TypeOf(object), reflect.TypeOf(StoredData{}))
 	if reflect.TypeOf(object) == reflect.TypeOf(StoredData{}){
 		val, ok := object.(StoredData)
 		if ok {
-			fmt.Println("Converted ", val)
 			return val.Value()
 		}
-		fmt.Println("Converted ", val, "is not valid")
 		return nil
 	}
 	return nil
