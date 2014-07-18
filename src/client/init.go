@@ -10,7 +10,7 @@ package client
 import (
 	"net"
 	"fmt"
-	"encoding/gob"
+	//"encoding/gob"
 )
 
 func Client(port string, message []byte) {
@@ -24,13 +24,13 @@ func Client(port string, message []byte) {
 	}
 	// send the message
 	fmt.Println("Client has sent a message: ", message)
-	err = gob.NewEncoder(c).Encode(message)
+	_, err = c.Write(message)
 
 	if err != nil {
 		fmt.Println("Error was occured during data transmission:", err)
 	}
-	var received_message []byte
-	err = gob.NewDecoder(c).Decode(&received_message)
+	var received_message = make([]byte, 255)
+	_, err = c.Read(received_message[0: ])
 	c.Close()
 	if err != nil {
 		fmt.Println("Error was occured during receiving of data:", err)

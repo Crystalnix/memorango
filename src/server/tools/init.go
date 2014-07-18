@@ -6,6 +6,8 @@ import (
 	"time"
 )
 
+const VERSION = "Go memcached implementation v1.0"
+
 //type for implementation of Cacheable interface
 type StoredData struct {
 	value []byte

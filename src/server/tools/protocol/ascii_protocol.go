@@ -11,11 +11,12 @@ const (
 	ERROR_TEMP = "ERROR\r\n"
 	CLIENT_ERROR_TEMP = "CLIENT_ERROR %s\r\n"
 	SERVER_ERROR_TEMP = "SERVER_ERROR %s\r\n"
+	NOT_FOUND = "NOT_FOUND\r\n"
 )
 
 var storage_commands = []string{"set", "add", "replace", "append", "prepend", "cas",}
 var retrieve_commands = []string{"get", "gets",}
-var other_commands = []string{"delete", "touch", "flush_all", "version", "quite",}
+var other_commands = []string{"delete", "touch", "flush_all", "version", "quit",}
 
 type Ascii_protocol_enum struct {
 	command string		// the main action of the passed request.
@@ -29,14 +30,13 @@ type Ascii_protocol_enum struct {
 	error string		// error, which appears when something goes wrong, normally is empty string ""
 }
 
-func ParseProtocolHeaders(request string) *Ascii_protocol_enum{
-	parsed_req := strings.Split(request, "\r\n")
-	if len(parsed_req[0]) > 0 {
-		command_line := strings.Split(parsed_req[0], " ")
+func ParseProtocolHeader(header string) *Ascii_protocol_enum{
+	if len(header) > 0 {
+		command_line := strings.Split(header, " ")
 		command := command_line[0]
 		switch true {
 		case tools.In(command, storage_commands):
-			return parseStorageCommands(command_line, parsed_req[1])
+			return parseStorageCommands(command_line)
 		case tools.In(command, retrieve_commands):
 			return parseRetrieveCommands(command_line)
 		case tools.In(command, other_commands):
@@ -49,13 +49,13 @@ func ParseProtocolHeaders(request string) *Ascii_protocol_enum{
 	}
 }
 
-func parseStorageCommands(args []string, data_block string) *Ascii_protocol_enum{
+func parseStorageCommands(args []string/*, data_block string*/) *Ascii_protocol_enum{
 	protocol := new(Ascii_protocol_enum)
-	if len(args) < 5 || len(data_block) == 0 || tools.In("", args) {
+	if len(args) < 5 || /*len(data_block) == 0 ||*/ tools.In("", args) {
 		return &Ascii_protocol_enum{error: ERROR_TEMP}
 	}
 	var err error
-	protocol.data_string = []byte(data_block)
+	//protocol.data_string = []byte(data_block)
 	protocol.command = args[0]
 	protocol.key = []string{args[1],}
 	protocol.flags, err = tools.StringToInt32(args[2])
@@ -127,5 +127,6 @@ func parseOtherCommands(args []string) *Ascii_protocol_enum {
 	}
 	return protocol
 }
+
 
 

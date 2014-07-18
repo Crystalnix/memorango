@@ -3,7 +3,6 @@ package cache
 import (
 	"container/list"
 	"time"
-	"fmt"
 )
 
 type Cacheable interface {
@@ -21,13 +20,17 @@ func (c *LRUCache) promote(item *LRUCacheItem) {
 	c.list.MoveToFront(item.listElement)
 }
 
-func (c *LRUCache) prune() {
-	for i := 0; i < 50; i++ {
+func (c *LRUCache) prune(amount int) {
+	// -1 flushes all
+	var counter = 0
+	for{
+		if amount != -1 && counter == amount { return }
 		tail := c.list.Back()
-		if tail == nil { return }
+		if tail == nil{ return }
 		item := c.list.Remove(tail).(*LRUCacheItem)
 		delete(c.items, item.Cacheable.Key())
 		c.capacity += int64(item.Cacheable.Size())
+		counter ++
 	}
 }
 
@@ -54,7 +57,7 @@ func (c *LRUCache) Get(key string) *LRUCacheItem {
 
 func (c *LRUCache) Set(Cacheable Cacheable, flags int, expiration_ts int64, cas_unique int64) bool {
 	if c.capacity < int64(Cacheable.Size()) {
-		c.prune()
+		c.prune(50)
 	}
 
 	//still not enough room, fail
@@ -80,13 +83,17 @@ func (c *LRUCache) Set(Cacheable Cacheable, flags int, expiration_ts int64, cas_
 	return true
 }
 
-func (c *LRUCache) Flush(Cacheable Cacheable) bool {
-	_, exists := c.items[Cacheable.Key()]
+func (c *LRUCache) Flush(key string) bool {
+	_, exists := c.items[key]
 	if exists {
 		// i really hope, that compiler knows about listElement which keeps deleted Cacheable
-		delete(c.items, Cacheable.Key())
+		delete(c.items, key)
 		return true
 	} else { return false }
+}
+
+func (c *LRUCache) FlushAll(){
+	c.prune(-1)
 }
 
 func New(capacity int64 /* bytes */) *LRUCache {
