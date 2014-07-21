@@ -14,6 +14,7 @@ import (
 )
 
 func Client(port string, message []byte) {
+
 	// connect to the server
 	c, err := net.Dial("tcp", "127.0.0.1:" + port)
 	defer c.Close()

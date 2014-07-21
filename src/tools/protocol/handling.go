@@ -1,13 +1,17 @@
 package protocol
 
 import (
-	"server/tools/cache"
-	"server/tools"
+	"tools/cache"
+	"tools"
 	"strings"
 	"errors"
 	"fmt"
 )
 
+// Public method of Ascii_protocol_enum operates with received storage: retrieves, discards, sets or updates items,
+// related to own containment.
+// Returns response to client as byte-string and error/nil.
+// If process was successful, there will be returned nil instead of error, otherwise it will be returned specified error.
 func (enum *Ascii_protocol_enum) HandleRequest(storage *cache.LRUCache) ([]byte, error) {
 	fmt.Println("Start handle request: ", enum)
 	var err error
@@ -35,6 +39,8 @@ func (enum *Ascii_protocol_enum) HandleRequest(storage *cache.LRUCache) ([]byte,
 }
 
 // Storage commands
+
+// Implements set method
 func (enum *Ascii_protocol_enum) set(storage *cache.LRUCache) (string, error){
 	if storage.Set(tools.NewStoredData(enum.data_string, enum.key[0]), enum.flags, enum.exptime, 0) {
 		return "STORED\r\n", nil
@@ -62,7 +68,10 @@ func (enum *Ascii_protocol_enum) replace(storage *cache.LRUCache) string {
 func (enum *Ascii_protocol_enum) cas(storage *cache.LRUCache) string {
 	return ""
 }
+
 // Retrieving commands
+
+// Implements get method
 func (enum *Ascii_protocol_enum) get(storage *cache.LRUCache) (string, error) {
 	var result = ""
 	for _, value := range enum.key{
@@ -88,6 +97,8 @@ func (enum *Ascii_protocol_enum) gets(storage *cache.LRUCache) (string, error) {
 }
 
 // Other commands
+
+// Implements touch method
 func (enum *Ascii_protocol_enum) touch(storage *cache.LRUCache) (string, error) {
 	if item := storage.Get(enum.key[0]); item == nil {
 		return NOT_FOUND, nil
@@ -99,6 +110,7 @@ func (enum *Ascii_protocol_enum) touch(storage *cache.LRUCache) (string, error) 
 	}
 }
 
+// Implements delete method
 func (enum *Ascii_protocol_enum) delete(storage *cache.LRUCache) (string, error) {
 	if storage.Flush(enum.key[0]){
 		return "DELETED\r\n", nil
@@ -106,20 +118,25 @@ func (enum *Ascii_protocol_enum) delete(storage *cache.LRUCache) (string, error)
 	return NOT_FOUND, nil
 }
 
+// Implements flush all method
 func (enum *Ascii_protocol_enum) flush_all(storage *cache.LRUCache) (string, error) {
 	storage.FlushAll()
 	return "OK\r\n", nil
 }
 
 // Utilities
+
+// Returns true if there was no "noreply" param in request.
 func (enum *Ascii_protocol_enum) Reply() bool {
 	return !enum.noreply
 }
 
+// Returns amount of bytes specified for data byte-string.
 func (enum *Ascii_protocol_enum) DataLen() int {
 	return enum.bytes
 }
 
+// Sets data byte-string of specified length to enumeration.
 func (enum *Ascii_protocol_enum) SetData(data []byte, length int) bool {
 	if enum.bytes == length {
 		enum.data_string = data[0 : length]

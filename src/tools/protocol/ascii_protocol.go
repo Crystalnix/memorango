@@ -1,12 +1,13 @@
 package protocol
 
 import (
-	"server/tools"
+	"tools"
 	"strings"
 	"strconv"
 	"errors"
 )
 
+// Templates for responses to a client.
 const (
 	ERROR_TEMP = "ERROR\r\n"
 	CLIENT_ERROR_TEMP = "CLIENT_ERROR %s\r\n"
@@ -14,10 +15,12 @@ const (
 	NOT_FOUND = "NOT_FOUND\r\n"
 )
 
+// Specified groups of commands, which are helpful for destination handling of request.
 var storage_commands = []string{"set", "add", "replace", "append", "prepend", "cas",}
 var retrieve_commands = []string{"get", "gets",}
 var other_commands = []string{"delete", "touch", "flush_all", "version", "quit",}
 
+// Enumeration of protocol headers.
 type Ascii_protocol_enum struct {
 	command string		// the main action of the passed request.
 	key []string		// key or keys for requested items.
@@ -30,6 +33,9 @@ type Ascii_protocol_enum struct {
 	error string		// error, which appears when something goes wrong, normally is empty string ""
 }
 
+// Public function, which parse string of input data to tokens of protocol's header and join them into one enumeration.
+// Function returns pointer to Ascii_protocol_enum struct with nil value of error field if parsing succeeded.
+// Otherwise error field consists information about occurred error and other fields are empty.
 func ParseProtocolHeader(header string) *Ascii_protocol_enum{
 	if len(header) > 0 {
 		command_line := strings.Split(header, " ")
@@ -49,6 +55,9 @@ func ParseProtocolHeader(header string) *Ascii_protocol_enum{
 	}
 }
 
+// Function for parsing of storage group of commands.
+// Receives array of string tokens.
+// Returns pointer to Ascii_protocol_enum with bound fields.
 func parseStorageCommands(args []string/*, data_block string*/) *Ascii_protocol_enum{
 	protocol := new(Ascii_protocol_enum)
 	if len(args) < 5 || /*len(data_block) == 0 ||*/ tools.In("", args) {
@@ -81,6 +90,9 @@ func parseStorageCommands(args []string/*, data_block string*/) *Ascii_protocol_
 	return protocol
 }
 
+// Function for parsing of retrieving group of commands.
+// Receives array of string tokens.
+// Returns pointer to Ascii_protocol_enum with bound fields.
 func parseRetrieveCommands(args []string) *Ascii_protocol_enum {
 	protocol := new(Ascii_protocol_enum)
 	if len(args) < 2 || tools.In("", args) {
@@ -96,6 +108,9 @@ func parseRetrieveCommands(args []string) *Ascii_protocol_enum {
 	return protocol
 }
 
+// Function for parsing of other group of commands.
+// Receives array of string tokens.
+// Returns pointer to Ascii_protocol_enum with bound fields.
 func parseOtherCommands(args []string) *Ascii_protocol_enum {
 	protocol := new(Ascii_protocol_enum)
 	var err error
@@ -127,6 +142,3 @@ func parseOtherCommands(args []string) *Ascii_protocol_enum {
 	}
 	return protocol
 }
-
-
-
