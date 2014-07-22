@@ -33,7 +33,7 @@ func (enum *Ascii_protocol_enum) HandleRequest(storage *cache.LRUCache) ([]byte,
 	case "version":
 		return []byte("VERSION " + tools.VERSION + "\r\n"), nil
 	case "quit":
-		return []byte(""), errors.New("It is not a error")
+		return nil, errors.New("It is not a error")
 	}
 	return []byte(result), err
 }

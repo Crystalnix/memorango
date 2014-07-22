@@ -90,7 +90,8 @@ func isUnixTimeStamp(ts int64) bool {
 	return ts > 60 * 60 * 24 * 30 // if more than 30 days
 }
 
-// Function converts passed number into a timestamp offset from current moment, if such number not a timestamp already.
+// Function converts passed number into a timestamp offset from current moment,
+// if such number not a zero and not a timestamp already.
 // Otherwise, it just return passed value.
 func ToTimeStampFromNow(ts int64) int64 {
 	if !isUnixTimeStamp(ts) && ts != 0 {

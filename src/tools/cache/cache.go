@@ -106,9 +106,9 @@ func (c *LRUCache) Set(Cacheable Cacheable, flags int, expiration_ts int64, cas_
 // Public method of LRUCache, which discard item by received key param.
 // Function returns true if such item does exist, otherwise false.
 func (c *LRUCache) Flush(key string) bool {
-	_, exists := c.items[key]
+	item, exists := c.items[key]
 	if exists {
-		// i really hope, that compiler knows about listElement which keeps deleted Cacheable
+		c.list.Remove(item.listElement)
 		delete(c.items, key)
 		return true
 	} else { return false }
@@ -121,8 +121,9 @@ func (c *LRUCache) FlushAll(){
 
 // Public function, which creates LRUCache instance.
 // Function receives capacity param, which is uses for set of max allocating memory.
-// Function returns pointer to created instance.
+// Function returns pointer to created instance or nil if capacity is invalid.
 func New(capacity int64 /* bytes */) *LRUCache {
+	if capacity <= 0 { return nil }
 	return &LRUCache{
 		capacity: capacity,
 		items: make(map[string] *LRUCacheItem, 10000),
@@ -138,6 +139,7 @@ func (c *LRUCache) deleteExpired(Cacheable Cacheable) bool {
 	item, exists := c.items[Cacheable.Key()]
 	if exists {
 		if item.Exptime < time.Now().Unix() && item.Exptime != 0 {
+			c.list.Remove(item.listElement)
 			delete(c.items, item.Cacheable.Key())
 			return true
 		}

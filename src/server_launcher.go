@@ -31,7 +31,7 @@ func main() {
 			}
 		}
 	} else {
-		// Doesn't let the process fall.
+		// Piece of code below doesn't let the process fall.
 		var w sync.WaitGroup
 		w.Add(1)
 		w.Wait()

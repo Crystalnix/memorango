@@ -3,7 +3,6 @@ package protocol
 import (
 	"tools"
 	"strings"
-	"strconv"
 	"errors"
 )
 
@@ -75,7 +74,7 @@ func parseStorageCommands(args []string/*, data_block string*/) *Ascii_protocol_
 		if len(args) < 6 {
 			err = errors.New("invalid arguments number")
 		}
-		protocol.cas_unique, err = strconv.ParseInt(args[5], 10, 64)
+		protocol.cas_unique, err = tools.StringToInt64(args[5])
 		if len(args) == 7 {
 			protocol.noreply = (args[6] == "noreply")
 		}
@@ -99,12 +98,8 @@ func parseRetrieveCommands(args []string) *Ascii_protocol_enum {
 		return &Ascii_protocol_enum{error: ERROR_TEMP}
 	}
 	protocol.command = args[0]
-	if args[len(args) - 1] != "noreply" {
-		protocol.key = args[1 : ]
-	} else {
-		protocol.key = args[1 : len(args) - 2]
-		protocol.noreply = true
-	}
+	protocol.noreply = false
+	protocol.key = args[1 : ]
 	return protocol
 }
 
@@ -119,18 +114,21 @@ func parseOtherCommands(args []string) *Ascii_protocol_enum {
 		err = errors.New("invalid arguments")
 	}
 	protocol.command = args[0]
+	protocol.noreply = (args[len(args) - 1] == "noreply")
 	switch args[0]{
 	case "delete":
-		if len(args) < 2{
+		if len(args) < 2 {
 			err = errors.New("invalid arguments number")
+		} else {
+			protocol.key = []string{args[1], }
 		}
-		protocol.key = []string{args[1], }
 	case "touch":
 		if len(args) < 3{
 			err = errors.New("invalid arguments number")
+		} else {
+			protocol.key = []string{args[1], }
+			protocol.exptime, err = tools.StringToInt64(args[2])
 		}
-		protocol.key = []string{args[1], }
-		protocol.exptime, err = tools.StringToInt64(args[2])
 	case "flush_all":
 		if len(args) >= 2 {
 			protocol.exptime, err = tools.StringToInt64(args[1])
