@@ -22,6 +22,12 @@ func (enum *Ascii_protocol_enum) HandleRequest(storage *cache.LRUCache) ([]byte,
 	switch enum.command {
 	case "set":
 		result, err = enum.set(storage)
+	case "add":
+		result, err = enum.add(storage)
+	case "append":
+		result, err = enum.append(storage)
+	case "prepend":
+		result, err = enum.prepend(storage)
 	case "get":
 		result, err = enum.get(storage)
 	case "touch":
@@ -43,30 +49,60 @@ func (enum *Ascii_protocol_enum) HandleRequest(storage *cache.LRUCache) ([]byte,
 // Implements set method
 func (enum *Ascii_protocol_enum) set(storage *cache.LRUCache) (string, error){
 	if storage.Set(tools.NewStoredData(enum.data_string, enum.key[0]), enum.flags, enum.exptime, 0) {
-		return "STORED\r\n", nil
+		return STORED, nil
 	} else {
 		return strings.Replace(SERVER_ERROR_TEMP, "%s", "Not enough memory", 1), errors.New("SERVER_ERROR")
 	}
 }
 
-func (enum *Ascii_protocol_enum) add(storage *cache.LRUCache) string {
-	return ""
+func (enum *Ascii_protocol_enum) add(storage *cache.LRUCache) (string, error) {
+	if storage.Get(enum.key[0]) != nil {
+		return NOT_STORED, nil
+	}
+	return enum.set(storage)
 }
 
-func (enum *Ascii_protocol_enum) prepend(storage *cache.LRUCache) string {
-	return ""
+func (enum *Ascii_protocol_enum) pending(storage *cache.LRUCache, existed_item *cache.LRUCacheItem, pending_data []byte) (string, error) {
+	enum.SetData(pending_data, len(pending_data))
+	enum.exptime = existed_item.Exptime
+	enum.cas_unique = existed_item.Cas_unique
+	enum.flags = existed_item.Flags
+	return enum.set(storage)
 }
 
-func (enum *Ascii_protocol_enum) append(storage *cache.LRUCache) string {
-	return ""
+func (enum *Ascii_protocol_enum) prepend(storage *cache.LRUCache) (string, error) {
+	existed_item := storage.Get(enum.key[0])
+	if existed_item == nil {
+		return NOT_STORED, nil
+	}
+	existed_data := tools.ExtractStoredData(existed_item.Cacheable)
+	if existed_data == nil {
+		return NOT_STORED, nil
+	}
+	return enum.pending(storage, existed_item, append(enum.data_string, existed_data))
 }
 
-func (enum *Ascii_protocol_enum) replace(storage *cache.LRUCache) string {
-	return ""
+func (enum *Ascii_protocol_enum) append(storage *cache.LRUCache) (string, error) {
+	existed_item := storage.Get(enum.key[0])
+	if existed_item == nil {
+		return NOT_STORED, nil
+	}
+	existed_data := tools.ExtractStoredData(existed_item.Cacheable)
+	if existed_data == nil {
+		return NOT_STORED, nil
+	}
+	return enum.pending(storage, existed_item, append(existed_data, enum.data_string))
 }
 
-func (enum *Ascii_protocol_enum) cas(storage *cache.LRUCache) string {
-	return ""
+func (enum *Ascii_protocol_enum) replace(storage *cache.LRUCache) (string, error) {
+	if storage.Get(enum.key[0]) == nil {
+		return NOT_STORED, nil
+	}
+	return enum.set(storage)
+}
+
+func (enum *Ascii_protocol_enum) cas(storage *cache.LRUCache) (string, error) {
+	return "", nil
 }
 
 // Retrieving commands

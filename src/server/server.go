@@ -62,28 +62,33 @@ func (server *server) run() {
 	//var received_message []byte
 	server.socket = listener
 	for {
-		// Accept waits for and returns the next connection to the listener.
+		// Accept waits for incoming data and returns the next connection to the listener.
 		fmt.Println("Waiting for connection...")
 		connection, err := listener.Accept()
 		if err != nil {
-			fmt.Println(err) // TODO: replace by kind of traceback
-			continue
+			fmt.Println(err, server.socket) // TODO: replace by kind of traceback
+			if server.socket == nil {
+				break
+			} else { continue }
+		} else {
+			// handle the connection
+			server.connections[connection.RemoteAddr().String()] = connection
+			go server.dispatch(connection.RemoteAddr().String())
 		}
-		// handle the connection
-
-		server.connections[connection.RemoteAddr().String()] = connection
-		go server.dispatch(connection.RemoteAddr().String())
-
 	}
 }
 
 // Private method of server struct, which closes socket listener and stops serving.
 func (server *server) stop() {
+	server.storage.FlushAll()
+	server.storage = nil
+	server.connections = nil
 	if server.socket != nil {
   		err := server.socket.Close()
 		if err != nil {
-			fmt.Println(err)
+			fmt.Println("Error occured during closing socket:", err)
 		}
+		server.socket = nil
 	} else {
 		log.Fatal("Server can't be stoped, because socket is undefined.")
 	}
@@ -168,7 +173,7 @@ func (server *server) breakConnection(connection net.Conn) {
 	delete(server.connections, connection.RemoteAddr().String())
 	err := connection.Close()
 	if err != nil {
-		fmt.Println(err)
+		fmt.Println("Can't break up connection: ", err)
 	}
 }
 

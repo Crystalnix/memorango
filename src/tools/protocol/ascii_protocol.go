@@ -12,6 +12,9 @@ const (
 	CLIENT_ERROR_TEMP = "CLIENT_ERROR %s\r\n"
 	SERVER_ERROR_TEMP = "SERVER_ERROR %s\r\n"
 	NOT_FOUND = "NOT_FOUND\r\n"
+	STORED = "STORED\r\n"
+	NOT_STORED = "NOT_STORED\r\n"
+	EXIST = "EXISTS\r\n"
 )
 
 // Specified groups of commands, which are helpful for destination handling of request.
