@@ -83,14 +83,14 @@ func TestServerReader(t *testing.T){
 	reader := bufio.NewReader(byteBuf)
 	res, n, err := readRequest(reader, -1)
 	if err != nil {
-		t.Fatalf("Unexpected behaviour: ", err)
+		t.Fatalf("Unexpected behaviour: ", err, res, n)
 	}
 	if string(res[0 : n - 2]) != "TEST" {
 		t.Fatalf("Unexpected response: %s", string(res))
 	}
 	res, n, err = readRequest(reader, 19)
 	if err != nil {
-		t.Fatalf("Unexpected behaviour: ", err)
+		t.Fatalf("Unexpected behaviour: ", err, res, n)
 	}
 	if string(res[0 : n - 2]) != "with-\r\n-terminators" {
 		t.Fatalf("Unexpected response: %s", string(res))

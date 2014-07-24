@@ -22,14 +22,20 @@ func (enum *Ascii_protocol_enum) HandleRequest(storage *cache.LRUCache) ([]byte,
 	switch enum.command {
 	case "set":
 		result, err = enum.set(storage)
+	case "cas":
+		result, err = enum.cas(storage)
 	case "add":
 		result, err = enum.add(storage)
+	case "replace":
+		result, err = enum.replace(storage)
 	case "append":
 		result, err = enum.append(storage)
 	case "prepend":
 		result, err = enum.prepend(storage)
 	case "get":
-		result, err = enum.get(storage)
+		result, err = enum.get(storage, false)
+	case "gets":
+		result, err = enum.get(storage, true)
 	case "touch":
 		result, err = enum.touch(storage)
 	case "delete":
@@ -55,6 +61,7 @@ func (enum *Ascii_protocol_enum) set(storage *cache.LRUCache) (string, error){
 	}
 }
 
+// Implements add method
 func (enum *Ascii_protocol_enum) add(storage *cache.LRUCache) (string, error) {
 	if storage.Get(enum.key[0]) != nil {
 		return NOT_STORED, nil
@@ -62,7 +69,12 @@ func (enum *Ascii_protocol_enum) add(storage *cache.LRUCache) (string, error) {
 	return enum.set(storage)
 }
 
-func (enum *Ascii_protocol_enum) pending(storage *cache.LRUCache, existed_item *cache.LRUCacheItem, pending_data []byte) (string, error) {
+// Utility method, for joining common parts of prepend/append methods.
+// Receives additional parameters: existing_item - item retrieved from cache, uses for inheritance such params as flags,
+// cas, exptime; pending_data - new concatenated data.
+func (enum *Ascii_protocol_enum) pending(storage *cache.LRUCache,
+										 existed_item *cache.LRUCacheItem, pending_data []byte) (string, error) {
+	enum.bytes = len(pending_data)
 	enum.SetData(pending_data, len(pending_data))
 	enum.exptime = existed_item.Exptime
 	enum.cas_unique = existed_item.Cas_unique
@@ -70,6 +82,7 @@ func (enum *Ascii_protocol_enum) pending(storage *cache.LRUCache, existed_item *
 	return enum.set(storage)
 }
 
+// Implements prepend method
 func (enum *Ascii_protocol_enum) prepend(storage *cache.LRUCache) (string, error) {
 	existed_item := storage.Get(enum.key[0])
 	if existed_item == nil {
@@ -79,9 +92,11 @@ func (enum *Ascii_protocol_enum) prepend(storage *cache.LRUCache) (string, error
 	if existed_data == nil {
 		return NOT_STORED, nil
 	}
-	return enum.pending(storage, existed_item, append(enum.data_string, existed_data))
+
+	return enum.pending(storage, existed_item, append(enum.data_string, existed_data...)) // some kind of golang magic
 }
 
+// Implements append method
 func (enum *Ascii_protocol_enum) append(storage *cache.LRUCache) (string, error) {
 	existed_item := storage.Get(enum.key[0])
 	if existed_item == nil {
@@ -91,9 +106,10 @@ func (enum *Ascii_protocol_enum) append(storage *cache.LRUCache) (string, error)
 	if existed_data == nil {
 		return NOT_STORED, nil
 	}
-	return enum.pending(storage, existed_item, append(existed_data, enum.data_string))
+	return enum.pending(storage, existed_item, append(existed_data, enum.data_string...)) // ...
 }
 
+// Implements replace method
 func (enum *Ascii_protocol_enum) replace(storage *cache.LRUCache) (string, error) {
 	if storage.Get(enum.key[0]) == nil {
 		return NOT_STORED, nil
@@ -101,14 +117,22 @@ func (enum *Ascii_protocol_enum) replace(storage *cache.LRUCache) (string, error
 	return enum.set(storage)
 }
 
+// Implementation of Check And Set method
 func (enum *Ascii_protocol_enum) cas(storage *cache.LRUCache) (string, error) {
-	return "", nil
+	existed_item := storage.Get(enum.key[0])
+	if existed_item != nil {
+		if existed_item.Cas_unique != enum.cas_unique || existed_item.Cas_unique == 0{
+			return NOT_FOUND, nil
+		}
+	}
+	return enum.set(storage)
 }
 
 // Retrieving commands
 
 // Implements get method
-func (enum *Ascii_protocol_enum) get(storage *cache.LRUCache) (string, error) {
+// Passed boolean param cas - defines of returning cas_unique
+func (enum *Ascii_protocol_enum) get(storage *cache.LRUCache, cas bool) (string, error) {
 	var result = ""
 	for _, value := range enum.key{
 		item := storage.Get(value)
@@ -118,18 +142,16 @@ func (enum *Ascii_protocol_enum) get(storage *cache.LRUCache) (string, error) {
 				continue
 			}
 			result += "VALUE " + value + " " + tools.IntToString(int64(item.Flags)) + " " + tools.IntToString(int64(len(data)))
-			if item.Cas_unique != 0 {
-				result += " " + tools.IntToString(item.Cas_unique)
+			if cas {
+				cas_id := tools.GenerateCasId(data)
+				storage.SetCas(value, cas_id)
+				result += " " + tools.IntToString(cas_id)
 			}
 			result += "\r\n"
 			result += string(data) + "\r\n"
 		}
 	}
 	return result + "END\r\n", nil
-}
-
-func (enum *Ascii_protocol_enum) gets(storage *cache.LRUCache) (string, error) {
-	return "", nil
 }
 
 // Other commands

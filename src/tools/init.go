@@ -7,6 +7,10 @@ import (
 	"strconv"
 	"reflect"
 	"time"
+	"crypto/sha1"
+	"bytes"
+	"bufio"
+	"encoding/binary"
 )
 
 // Current version string.
@@ -62,10 +66,16 @@ func StringToInt64(str string) (int64, error) {
 	return value, err
 }
 
-// Function convert 32-bit integer element to string.
+// Function convert 64-bit integer element to string.
 // If it is impossible, there will be returned a error.
 func IntToString(num int64) string {
 	return strconv.FormatInt(num, 10)
+}
+
+// Function convert 64-bit unsigned integer element to string.
+// If it is impossible, there will be returned a error.
+func UIntToString(num uint64) string {
+	return strconv.FormatUint(num, 10)
 }
 
 // Function is supposed to convert data from (firstly) Cacheable interface or any other interface, which was generalized
@@ -98,4 +108,16 @@ func ToTimeStampFromNow(ts int64) int64 {
 		ts = time.Now().Add(time.Second * time.Duration(ts)).Unix()
 	}
 	return ts
+}
+
+// Function converts passed byte-string to unique uint64, thus creates Cas Unique
+func GenerateCasId(buf []byte) int64 {
+	var hashSum = sha1.Sum( append(buf, IntToString(time.Now().Unix())...) )
+	var byteBuf = bytes.NewBuffer(hashSum[0 : ])
+	reader := bufio.NewReader(byteBuf)
+	num, err := binary.ReadVarint(reader)
+	if err != nil {
+		return 0
+	}
+	return num
 }

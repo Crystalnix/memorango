@@ -84,13 +84,10 @@ func (c *LRUCache) Set(Cacheable Cacheable, flags int, expiration_ts int64, cas_
 	if c.capacity < int64(Cacheable.Size()) {
 		return false
 	}
-
-	//TODO: CAS - Check And Set, need to handle such situation as cas_unique != 0
-
 	item, exists := c.items[Cacheable.Key()]
 	if exists {
 		item.Cacheable = Cacheable
-		item.Cas_unique = cas_unique // TODO: same as above
+		item.Cas_unique = cas_unique
 		item.Flags = flags
 		item.Exptime = expiration_ts
 		c.promote(item)
@@ -119,6 +116,18 @@ func (c *LRUCache) FlushAll(){
 	c.prune(-1)
 }
 
+// Public method of LRUCache, which sets Cas_unique field's value to passed param cas
+// for existed item with passed param key.
+// Returns true if item does exist, otherwise false.
+func (c *LRUCache) SetCas(key string, cas int64) bool {
+	_, exists := c.items[key]
+	if exists {
+		c.items[key].Cas_unique = cas
+		return true
+	}
+	return false
+}
+
 // Public function, which creates LRUCache instance.
 // Function receives capacity param, which is uses for set of max allocating memory.
 // Function returns pointer to created instance or nil if capacity is invalid.
@@ -130,7 +139,6 @@ func New(capacity int64 /* bytes */) *LRUCache {
 		list: list.New(),
 	}
 }
-
 
 // Private method of LRUCache, for flushing expired items.
 // Function receives an item to check. If it does exist and it's timestamp is less than Now, item will be discarded and

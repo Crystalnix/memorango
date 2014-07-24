@@ -22,7 +22,7 @@ var storage_commands = []string{"set", "add", "replace", "append", "prepend", "c
 var retrieve_commands = []string{"get", "gets",}
 var other_commands = []string{"delete", "touch", "flush_all", "version", "quit",}
 
-// Enumeration of protocol headers.
+// Enumeration of protocol tokens.
 type Ascii_protocol_enum struct {
 	command string		// the main action of the passed request.
 	key []string		// key or keys for requested items.
@@ -35,7 +35,7 @@ type Ascii_protocol_enum struct {
 	error string		// error, which appears when something goes wrong, normally is empty string ""
 }
 
-// Public function, which parse string of input data to tokens of protocol's header and join them into one enumeration.
+// Public function, which parse string of input data by tokens of protocol's header and join them into one enumeration.
 // Function returns pointer to Ascii_protocol_enum struct with nil value of error field if parsing succeeded.
 // Otherwise error field consists information about occurred error and other fields are empty.
 func ParseProtocolHeader(header string) *Ascii_protocol_enum{

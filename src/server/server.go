@@ -152,18 +152,29 @@ func (server *server) dispatch(address string) {
 // Otherwise, if read data exceed of MAX_KEY_LENGTH, it will be returned var of error type, but also data,
 // which was read and it's length (MAX_KEY_LENGTH)
 func readRequest(reader *bufio.Reader, length int) ([]byte, int, error){
-	buffer := make([]byte, MAX_KEY_LENGTH)
-	var symbol byte
+	buffer := []byte("")
+	var prev_symbol byte
 	var counter = 0
+	var token_counter = 0
 	if length == 0 { return buffer, 0, nil }
-	for index, _ := range buffer {
-		if index >= MAX_KEY_LENGTH { return buffer, counter, errors.New("Header length is exceeded.") }
+	for {
+		//if index >= MAX_KEY_LENGTH { return buffer, counter, errors.New("Header's length is exceeded.") }
+
 		read, err := reader.ReadByte()
-		if err != nil { return buffer, counter, err }
-		buffer[index] = read
+		if err != nil {
+			fmt.Println("Num: ", counter,"read: ", read, "Err: ", err)
+			return buffer, counter, err
+		}
+		buffer = append(buffer, read)
 		counter ++
-		if read == '\n' && symbol == '\r' && (length == -1 || index - 1 == length) { break }
-		symbol = read
+		if read == '\n' && prev_symbol == '\r' && (length == -1 || counter - 2 == length) { break }
+		if read != ' ' {
+			token_counter ++
+			if token_counter > MAX_KEY_LENGTH { return buffer, counter, errors.New("Maximal key length is exceeded.") }
+		} else {
+			token_counter = 0
+		}
+		prev_symbol = read
 	}
 	return buffer, counter, nil
 }
@@ -183,6 +194,7 @@ func (server *server) makeResponse(connection net.Conn, response_message []byte,
 	length, err := connection.Write(response_message[0 : length])
 	if err != nil {
 		fmt.Println("Error was occured during making response:", err)
+		server.breakConnection(connection)
 	}
 }
 
