@@ -32,6 +32,10 @@ func (enum *Ascii_protocol_enum) HandleRequest(storage *cache.LRUCache) ([]byte,
 		result, err = enum.append(storage)
 	case "prepend":
 		result, err = enum.prepend(storage)
+	case "incr":
+		result, err = enum.fold(storage, 1)
+	case "decr":
+		result, err = enum.fold(storage, -1)
 	case "get":
 		result, err = enum.get(storage, false)
 	case "gets":
@@ -180,6 +184,32 @@ func (enum *Ascii_protocol_enum) delete(storage *cache.LRUCache) (string, error)
 func (enum *Ascii_protocol_enum) flush_all(storage *cache.LRUCache) (string, error) {
 	storage.FlushAll()
 	return "OK\r\n", nil
+}
+
+// Utility method, for joining common parts of incr/decr methods.
+// Receives additional param sign, which defines operation: -1 or 1
+func (enum *Ascii_protocol_enum) fold(storage *cache.LRUCache, sign int) (string, error) {
+	if item := storage.Get(enum.key[0]); item != nil && (sign == 1 || sign == -1) {
+		existed_data := tools.ExtractStoredData(item.Cacheable)
+		if existed_data != nil {
+			evaluated_data_for_existed, err_for_existed := tools.StringToInt64(string(existed_data))
+			evaluated_data_for_passed, err_for_passed := tools.StringToUInt64(string(enum.data_string))
+			if err_for_existed == nil && err_for_passed == nil {
+				var result string
+				if sign > 0 {
+					result = tools.IntToString(evaluated_data_for_existed + int64(evaluated_data_for_passed))
+				} else {
+					result = tools.IntToString(evaluated_data_for_existed - int64(evaluated_data_for_passed))
+				}
+				if storage.Set(tools.NewStoredData([]byte(result), enum.key[0]), item.Flags, item.Exptime, 0) {
+					return result+"\r\n", nil
+				}
+				return strings.Replace(SERVER_ERROR_TEMP, "%s", "Not enough memory", 1), errors.New("SERVER_ERROR")
+			}
+			return ERROR_TEMP, nil
+		}
+	}
+	return NOT_FOUND, nil
 }
 
 // Utilities

@@ -20,7 +20,7 @@ const (
 // Specified groups of commands, which are helpful for destination handling of request.
 var storage_commands = []string{"set", "add", "replace", "append", "prepend", "cas",}
 var retrieve_commands = []string{"get", "gets",}
-var other_commands = []string{"delete", "touch", "flush_all", "version", "quit",}
+var other_commands = []string{"delete", "touch", "flush_all", "version", "quit", "incr", "decr"}
 
 // Enumeration of protocol tokens.
 type Ascii_protocol_enum struct {
@@ -136,6 +136,14 @@ func parseOtherCommands(args []string) *Ascii_protocol_enum {
 		if len(args) >= 2 {
 			protocol.exptime, err = tools.StringToInt64(args[1])
 		}
+	case "incr", "decr":
+		if len(args) < 3 {
+			err = errors.New("invalid arguments number")
+		} else {
+			protocol.key = []string{args[1], }
+			protocol.data_string = []byte(args[2])
+		}
+		protocol.noreply = (args[len(args) - 1] == "noreply")
 	}
 	protocol.exptime = tools.ToTimeStampFromNow(protocol.exptime)
 	if err != nil {

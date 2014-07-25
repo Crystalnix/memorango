@@ -147,10 +147,11 @@ func (server *server) dispatch(address string) {
 
 // This private function serves for reading an input stream per byte till the \r\n terminator
 // or until the length param won't be achieved.
-// Function returns byte-string, it's length and error.
-// If process succeeded, instead of error will be return nil.
-// Otherwise, if read data exceed of MAX_KEY_LENGTH, it will be returned var of error type, but also data,
-// which was read and it's length (MAX_KEY_LENGTH)
+// Function receives pointer to bufio.Reader, which contains a stream and length, which of required data.
+// If the length param equals -1, it means, that data's length is undefined, and it will be read until first \r\n seq.
+// Function returns byte-string, it's length and (optionally) error.
+// If process succeeded, instead of error will be returned a nil.
+// Otherwise, will be returned occurred error, and also read data and it's length.
 func readRequest(reader *bufio.Reader, length int) ([]byte, int, error){
 	buffer := []byte("")
 	var prev_symbol byte
@@ -158,19 +159,28 @@ func readRequest(reader *bufio.Reader, length int) ([]byte, int, error){
 	var token_counter = 0
 	if length == 0 { return buffer, 0, nil }
 	for {
-		//if index >= MAX_KEY_LENGTH { return buffer, counter, errors.New("Header's length is exceeded.") }
-
 		read, err := reader.ReadByte()
 		if err != nil {
-			fmt.Println("Num: ", counter,"read: ", read, "Err: ", err)
+			fmt.Println("Num: ", counter," read: ", read, " Err: ", err)
 			return buffer, counter, err
 		}
 		buffer = append(buffer, read)
 		counter ++
-		if read == '\n' && prev_symbol == '\r' && (length == -1 || counter - 2 == length) { break }
-		if read != ' ' {
+		if length == -1 || counter - 2 == length {
+			if read == '\n' && prev_symbol == '\r' {
+				break
+			} else {
+				if length != -1 {
+					return buffer, counter, errors.New("Length was achieved, but terminator wasn't met.")
+				}
+			}
+
+		}
+		if read != ' ' && length == -1 /* in case of header of unknown length */{
 			token_counter ++
-			if token_counter > MAX_KEY_LENGTH { return buffer, counter, errors.New("Maximal key length is exceeded.") }
+			if token_counter > MAX_KEY_LENGTH {
+				return buffer, counter, errors.New("Maximal key length is exceeded.")
+			}
 		} else {
 			token_counter = 0
 		}

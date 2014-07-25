@@ -59,11 +59,16 @@ func StringToInt32(str string) (int, error) {
 	return int(value), err
 }
 
-// Function convert string element to 32-bit decimal integer.
+// Function convert string element to 64-bit decimal integer.
 // If it is impossible, there will be return error.
 func StringToInt64(str string) (int64, error) {
-	value, err := strconv.ParseInt(str, 10, 64)
-	return value, err
+	return strconv.ParseInt(str, 10, 64)
+}
+
+// Function convert string element to 64-bit decimal unsigned integer.
+// If it is impossible, there will be return error.
+func StringToUInt64(str string) (uint64, error) {
+	return strconv.ParseUint(str, 10, 64)
 }
 
 // Function convert 64-bit integer element to string.
@@ -83,11 +88,8 @@ func UIntToString(num uint64) string {
 // If it is impossible there will be returned a nil.
 func ExtractStoredData(object interface {}) []byte {
 	if reflect.TypeOf(object) == reflect.TypeOf(StoredData{}){
-		val, ok := object.(StoredData)
-		if ok {
-			return val.Value()
-		}
-		return nil
+		val, _ := object.(StoredData)
+		return val.Value()
 	}
 	return nil
 }
@@ -112,12 +114,9 @@ func ToTimeStampFromNow(ts int64) int64 {
 
 // Function converts passed byte-string to unique uint64, thus creates Cas Unique
 func GenerateCasId(buf []byte) int64 {
-	var hashSum = sha1.Sum( append(buf, IntToString(time.Now().Unix())...) )
+	var hashSum = sha1.Sum( append(buf, IntToString(time.Now().UnixNano())...) )
 	var byteBuf = bytes.NewBuffer(hashSum[0 : ])
 	reader := bufio.NewReader(byteBuf)
-	num, err := binary.ReadVarint(reader)
-	if err != nil {
-		return 0
-	}
+	num, _ := binary.ReadVarint(reader) // algorithm guaranties safety
 	return num
 }

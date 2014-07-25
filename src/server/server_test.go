@@ -70,14 +70,36 @@ func TestServerConsistenceAndConnections(t *testing.T){
 	   remote_connection.RemoteAddr().String() != connection.LocalAddr().String() {
 		t.Fatalf("Connections mismatch")
 	}
-
-	srv.breakConnection(remote_connection)
-	if len(srv.connections) != 0 {
-		t.Fatalf("Connection is still acitve.")
-	}
 }
 
-func TestServerReader(t *testing.T){
+func TestServerResponseAndConnections(t *testing.T){
+	srv := RunServer(test_port, 1024)
+	time.Sleep(time.Millisecond * time.Duration(10))
+	defer StopServer(srv)
+	connection, err := net.Dial("tcp", test_address)
+	var test_msg = []byte("Test1\r\n")
+	_, err = connection.Write(test_msg)
+	if err != nil {
+		t.Fatalf("Stream is unavailable to transmit data: ", err)
+	}
+	remote_connection := srv.connections[connection.LocalAddr().String()]
+	srv.makeResponse(remote_connection, []byte("TestResponse"), 12)
+	var test_response = make([]byte, 12)
+	n, err := connection.Read(test_response[0 : ])
+	if n != 12 || err != nil {
+		t.Fatalf("Connection stream is empty: ", n, err)
+	}
+	if string(test_response) != "TestResponse" {
+		t.Fatalf("Unexpected response:< %s >", string(test_response))
+	}
+	srv.breakConnection(remote_connection)
+	if len(srv.connections) != 0 {
+		t.Fatalf("Connection is still alive: ", srv.connections)
+	}
+
+}
+
+func TestServerReader1(t *testing.T){
 	var test_msg = []byte("TEST\r\nwith-\r\n-terminators\r\n")
 	var byteBuf = bytes.NewBuffer(test_msg)
 	reader := bufio.NewReader(byteBuf)
@@ -95,5 +117,29 @@ func TestServerReader(t *testing.T){
 	if string(res[0 : n - 2]) != "with-\r\n-terminators" {
 		t.Fatalf("Unexpected response: %s", string(res))
 	}
-	fmt.Println("Success")
+
+}
+
+func TestServerReader2(t *testing.T){
+	var test_msg = make([]byte, 300)
+	var byteBuf = bytes.NewBuffer(test_msg)
+	reader := bufio.NewReader(byteBuf)
+	res, n, err := readRequest(reader, -1)
+	if err == nil {
+		t.Fatalf("Unexpected behaviour: ", res, n)
+	}
+	byteBuf = bytes.NewBuffer(test_msg)
+	reader = bufio.NewReader(byteBuf)
+	res, n, err = readRequest(reader, 42)
+	if err == nil {
+		t.Fatalf("Unexpected behaviour: ", res, n)
+	}
+	test_msg[298] = '\r'
+	test_msg[299] = '\n'
+	byteBuf = bytes.NewBuffer(test_msg)
+	reader = bufio.NewReader(byteBuf)
+	res, n, err = readRequest(reader, 298)
+	if err != nil {
+		t.Fatalf("Unexpected behaviour: ", err, res, n)
+	}
 }

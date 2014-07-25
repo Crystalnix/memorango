@@ -151,3 +151,14 @@ func TestCacheFlushItemSuite2(t *testing.T){
 		t.Fatalf("The length of list was changed.")
 	}
 }
+
+func TestCacheSetCasSuite(t *testing.T){
+	cache := New(10)
+	cache.Set(tools.NewStoredData([]byte("TEST"), "key"), 0, 0, 0)
+	if cache.SetCas("not_key", 424242) || !cache.SetCas("key", 424242) {
+		t.Fatalf("Unexpected behavior")
+	}
+	if cache.Get("key").Cas_unique != 424242 {
+		t.Fatalf("Cas unique wasn't set")
+	}
+}

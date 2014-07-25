@@ -123,3 +123,36 @@ func TestToTimeStamp(t *testing.T){
 	}
 
 }
+
+func TestCasGenerator(t *testing.T){
+	cas1 := GenerateCasId([]byte("Test"))
+	cas2 := GenerateCasId([]byte("Test"))
+	if cas1 == cas2 {
+		t.Fatalf("Two identificators with same conditions are matched: %d", cas1)
+	}
+}
+
+func TestUintToString(t *testing.T){
+	if UIntToString(+424242) != "424242"{
+		t.Fatalf("The result is unexpected.")
+	}
+}
+
+func TestStringToUInt64(t *testing.T){
+	res, err := StringToUInt64("424242")
+	if err != nil || res != uint64(424242) {
+		t.Fatalf("The result is unexpected: ", res, err)
+	}
+	res, err = StringToUInt64("-424242")
+	if err == nil {
+		t.Fatalf("The result is unexpected: ", res, err)
+	}
+}
+
+
+func TestExtraction(t *testing.T){
+	data := NewStoredData([]byte("42"), "42")
+	if ExtractStoredData(data) == nil || ExtractStoredData("42") != nil {
+		t.Fatalf("The result is unexpected.")
+	}
+}
