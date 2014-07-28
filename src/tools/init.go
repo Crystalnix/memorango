@@ -83,7 +83,7 @@ func UIntToString(num uint64) string {
 	return strconv.FormatUint(num, 10)
 }
 
-// Function is supposed to convert data from (firstly) Cacheable interface or any other interface, which was generalized
+// Function is supposed to convert data from (primary) Cacheable interface or any other interface, which was generalized
 // by StoredData type, back to StoredData and return byte-string value of it.
 // If it is impossible there will be returned a nil.
 func ExtractStoredData(object interface {}) []byte {
