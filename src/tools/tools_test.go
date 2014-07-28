@@ -3,6 +3,7 @@ package tools
 import (
 	"testing"
 	"time"
+	"math/rand"
 )
 
 func TestStoringData(t *testing.T){
@@ -125,8 +126,9 @@ func TestToTimeStamp(t *testing.T){
 }
 
 func TestCasGenerator(t *testing.T){
-	cas1 := GenerateCasId([]byte("Test"))
-	cas2 := GenerateCasId([]byte("Test"))
+	rand.Seed(time.Now().Unix())
+	cas1 := GenerateCasId()
+	cas2 := GenerateCasId()
 	if cas1 == cas2 {
 		t.Fatalf("Two identificators with same conditions are matched: %d", cas1)
 	}

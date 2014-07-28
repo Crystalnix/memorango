@@ -7,10 +7,7 @@ import (
 	"strconv"
 	"reflect"
 	"time"
-	"crypto/sha1"
-	"bytes"
-	"bufio"
-	"encoding/binary"
+	"math/rand"
 )
 
 // Current version string.
@@ -113,10 +110,7 @@ func ToTimeStampFromNow(ts int64) int64 {
 }
 
 // Function converts passed byte-string to unique uint64, thus creates Cas Unique
-func GenerateCasId(buf []byte) int64 {
-	var hashSum = sha1.Sum( append(buf, IntToString(time.Now().UnixNano())...) )
-	var byteBuf = bytes.NewBuffer(hashSum[0 : ])
-	reader := bufio.NewReader(byteBuf)
-	num, _ := binary.ReadVarint(reader) // algorithm guaranties safety
-	return num
+func GenerateCasId() int64 {
+	//rand.Seed(time.Now().UnixNano())
+	return rand.Int63()
 }

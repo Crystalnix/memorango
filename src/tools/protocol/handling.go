@@ -147,7 +147,7 @@ func (enum *Ascii_protocol_enum) get(storage *cache.LRUCache, cas bool) (string,
 			}
 			result += "VALUE " + value + " " + tools.IntToString(int64(item.Flags)) + " " + tools.IntToString(int64(len(data)))
 			if cas {
-				cas_id := tools.GenerateCasId(data)
+				cas_id := tools.GenerateCasId()
 				storage.SetCas(value, cas_id)
 				result += " " + tools.IntToString(cas_id)
 			}

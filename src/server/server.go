@@ -15,6 +15,8 @@ bufio - used for parsing request per byte.
 
 errors - used for creation of custom error.
 
+math/rand and time - used for seeding the PRNG
+
 - Internal:
 
 tools - contains several utilities for convenient usage facilities.
@@ -35,6 +37,8 @@ import (
 	"io"
 	"bufio"
 	"errors"
+	"math/rand"
+	"time"
 )
 
 const (
@@ -54,6 +58,7 @@ type server struct {
 
 // Private method of server structure, which starts to listen connection, cache it and delegate it to dispatcher.
 func (server *server) run() {
+	rand.Seed(time.Now().Unix())
 	listener, err := net.Listen("tcp", ":" + server.port)
 	if err != nil {
 		fmt.Println(err)
@@ -62,14 +67,15 @@ func (server *server) run() {
 	//var received_message []byte
 	server.socket = listener
 	for {
+		if server.socket == nil {
+			break
+		}
 		// Accept waits for incoming data and returns the next connection to the listener.
 		fmt.Println("Waiting for connection...")
-		connection, err := listener.Accept()
+		connection, err := server.socket.Accept()
 		if err != nil {
-			fmt.Println(err, server.socket) // TODO: replace by kind of traceback
-			if server.socket == nil {
-				break
-			} else { continue }
+			fmt.Println("Error occured while accepting connection: ", err) // TODO: replace by kind of traceback
+			continue
 		} else {
 			// handle the connection
 			server.connections[connection.RemoteAddr().String()] = connection
@@ -82,6 +88,13 @@ func (server *server) run() {
 func (server *server) stop() {
 	server.storage.FlushAll()
 	server.storage = nil
+	for address, connection := range server.connections {
+		if server.breakConnection(connection) {
+			fmt.Println("Closed connection at", address)
+		} else {
+			fmt.Println("Can't close connection at", address)
+		}
+	}
 	server.connections = nil
 	if server.socket != nil {
   		err := server.socket.Close()
@@ -92,7 +105,6 @@ func (server *server) stop() {
 	} else {
 		log.Fatal("Server can't be stoped, because socket is undefined.")
 	}
-
 }
 
 // Private method of server, which dispatches active incoming connection.
@@ -119,7 +131,9 @@ func (server *server) dispatch(address string) {
 				break
 			}
 			fmt.Println("Dispatching error: ", err, " Message: ", received_message)
-			server.makeResponse(connection, []byte("ERROR\r\n"), 5)
+			if !server.makeResponse(connection, []byte("ERROR\r\n"), 5){
+				break
+			}
 		} else {
 			// Here the message should be handled
 			parsed_request := protocol.ParseProtocolHeader(string(received_message[0 : n - 2]))
@@ -190,22 +204,25 @@ func readRequest(reader *bufio.Reader, length int) ([]byte, int, error){
 }
 
 // Private method break up the connection, closes it and removes it from cached server's connections.
-func (server *server) breakConnection(connection net.Conn) {
+func (server *server) breakConnection(connection net.Conn) bool {
 	delete(server.connections, connection.RemoteAddr().String())
 	err := connection.Close()
 	if err != nil {
 		fmt.Println("Can't break up connection: ", err)
+		return false
 	}
+	return true
 }
 
 // Private method writes a byte-string to connection output stream.
 // Function receives connection, message and length of this message.
-func (server *server) makeResponse(connection net.Conn, response_message []byte, length int) {
+func (server *server) makeResponse(connection net.Conn, response_message []byte, length int) bool {
 	length, err := connection.Write(response_message[0 : length])
 	if err != nil {
 		fmt.Println("Error was occured during making response:", err)
-		server.breakConnection(connection)
+		return server.breakConnection(connection)
 	}
+	return true
 }
 
 // This public function raises up the server.

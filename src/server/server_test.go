@@ -9,14 +9,14 @@ import (
 	"bufio"
 )
 
-const (
-	test_port = "60001"
-	test_address = "127.0.0.1:" + test_port
-)
+var test_port = "60000"
+var test_address = "127.0.0.1:" + test_port
 
 func TestServerRunAndStop(t *testing.T){
+//	var test_port = "60000"
+//	var test_address = "127.0.0.1:" + test_port
 	srv := RunServer(test_port, 1024)
-	time.Sleep(time.Millisecond * time.Duration(5))
+	time.Sleep(time.Millisecond * time.Duration(5)) // Let's wait a bit while goroutines will start
 	connection, err := net.Dial("tcp", test_address)
 	if err != nil {
 		t.Fatalf("Server wasn't run: %s", err)
@@ -38,6 +38,7 @@ func TestServerRunAndStop(t *testing.T){
 	fmt.Println("Response: ", string(response))
 	StopServer(srv)
 	connection.Close()
+	time.Sleep(time.Millisecond * time.Duration(5)) // let's wait a bit while all goroutines will finish
 	connection, err = net.Dial("tcp", test_address)
 	if err == nil {
 		t.Fatalf("Server is still running at %s", test_address)
@@ -45,6 +46,8 @@ func TestServerRunAndStop(t *testing.T){
 }
 
 func TestServerConsistenceAndConnections(t *testing.T){
+//	var test_port = "60001"
+//	var test_address = "127.0.0.1:" + test_port
 	srv := RunServer(test_port, 1024)
 	time.Sleep(time.Millisecond * time.Duration(10))
 	defer StopServer(srv)
@@ -73,6 +76,8 @@ func TestServerConsistenceAndConnections(t *testing.T){
 }
 
 func TestServerResponseAndConnections(t *testing.T){
+//	var test_port = "60002"
+//	var test_address = "127.0.0.1:" + test_port
 	srv := RunServer(test_port, 1024)
 	time.Sleep(time.Millisecond * time.Duration(10))
 	defer StopServer(srv)
@@ -83,7 +88,9 @@ func TestServerResponseAndConnections(t *testing.T){
 		t.Fatalf("Stream is unavailable to transmit data: ", err)
 	}
 	remote_connection := srv.connections[connection.LocalAddr().String()]
-	srv.makeResponse(remote_connection, []byte("TestResponse"), 12)
+	if !srv.makeResponse(remote_connection, []byte("TestResponse"), 12){
+		t.Fatalf("Server is unavailable to make response.")
+	}
 	var test_response = make([]byte, 12)
 	n, err := connection.Read(test_response[0 : ])
 	if n != 12 || err != nil {
@@ -92,11 +99,12 @@ func TestServerResponseAndConnections(t *testing.T){
 	if string(test_response) != "TestResponse" {
 		t.Fatalf("Unexpected response:< %s >", string(test_response))
 	}
-	srv.breakConnection(remote_connection)
+	if !srv.breakConnection(remote_connection){
+		t.Fatalf("Server is unavailable to break connection at %s", remote_connection.RemoteAddr().String())
+	}
 	if len(srv.connections) != 0 {
 		t.Fatalf("Connection is still alive: ", srv.connections)
 	}
-
 }
 
 func TestServerReader1(t *testing.T){
