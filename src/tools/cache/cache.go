@@ -22,6 +22,17 @@ type LRUCacheItem struct {
 	Exptime int64
 	Cas_unique int64
 	listElement *list.Element
+	touched bool
+}
+
+// Structure for storage statistics.
+type LRUCacheStat struct {
+	Volume int64
+	Evictions uint64
+	Expired_unfetched uint64
+	Evicted_unfetched uint64
+	Current_items int
+	Total_items int64
 }
 
 // Implementation of LRUCache itself.
@@ -30,10 +41,12 @@ type LRUCache struct {
 	capacity int64 // bytes
 	items map[string] *LRUCacheItem
 	list *list.List
+	Stats *LRUCacheStat
 }
 
 // Private method of LRUCache for promoting item to the top of list.
 func (c *LRUCache) promote(item *LRUCacheItem) {
+	item.touched = true
 	c.list.MoveToFront(item.listElement)
 }
 
@@ -47,9 +60,16 @@ func (c *LRUCache) prune(amount int) {
 		tail := c.list.Back()
 		if tail == nil{ return }
 		item := c.list.Remove(tail).(*LRUCacheItem)
+		if amount != -1 {
+			c.Stats.Evictions ++
+			if !item.touched {
+				c.Stats.Evicted_unfetched ++
+			}
+		}
 		delete(c.items, item.Cacheable.Key())
 		c.capacity += int64(item.Cacheable.Size())
 		counter ++
+		c.Stats.Current_items --
 	}
 }
 
@@ -92,10 +112,18 @@ func (c *LRUCache) Set(Cacheable Cacheable, flags int, expiration_ts int64, cas_
 		item.Exptime = expiration_ts
 		c.promote(item)
 	} else {
-		item = &LRUCacheItem{Cacheable: Cacheable, Flags: flags, Exptime: expiration_ts, Cas_unique: cas_unique}
+		item = &LRUCacheItem{
+			Cacheable: Cacheable,
+			Flags: flags,
+			Exptime: expiration_ts,
+			Cas_unique: cas_unique,
+			touched: false,
+		}
 		item.listElement = c.list.PushFront(item)
 		c.items[Cacheable.Key()] = item
 		c.capacity -= int64(Cacheable.Size())
+		c.Stats.Current_items ++
+		c.Stats.Total_items ++
 	}
 	return true
 }
@@ -107,6 +135,7 @@ func (c *LRUCache) Flush(key string) bool {
 	if exists {
 		c.list.Remove(item.listElement)
 		delete(c.items, key)
+		c.Stats.Current_items --
 		return true
 	} else { return false }
 }
@@ -128,6 +157,12 @@ func (c *LRUCache) SetCas(key string, cas int64) bool {
 	return false
 }
 
+// Getter for private capacity param
+// TODO: Test for this
+func (c *LRUCache) Capacity() int64 {
+	return c.capacity
+}
+
 // Public function, which creates LRUCache instance.
 // Function receives capacity param, which is uses for set of max allocating memory.
 // Function returns pointer to created instance or nil if capacity is invalid.
@@ -137,6 +172,7 @@ func New(capacity int64 /* bytes */) *LRUCache {
 		capacity: capacity,
 		items: make(map[string] *LRUCacheItem, 10000),
 		list: list.New(),
+		Stats: &LRUCacheStat{capacity, 0, 0, 0, 0, 0},
 	}
 }
 
@@ -148,7 +184,11 @@ func (c *LRUCache) deleteExpired(Cacheable Cacheable) bool {
 	if exists {
 		if item.Exptime < time.Now().Unix() && item.Exptime != 0 {
 			c.list.Remove(item.listElement)
+			if !item.touched {
+				c.Stats.Expired_unfetched ++
+			}
 			delete(c.items, item.Cacheable.Key())
+			c.Stats.Current_items --
 			return true
 		}
 	}

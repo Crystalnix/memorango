@@ -109,7 +109,7 @@ func ToTimeStampFromNow(ts int64) int64 {
 	return ts
 }
 
-// Function converts passed byte-string to unique uint64, thus creates Cas Unique
+// Function generates unique 64 bits integer Cas identificator
 func GenerateCasId() int64 {
 	//rand.Seed(time.Now().UnixNano())
 	return rand.Int63()
