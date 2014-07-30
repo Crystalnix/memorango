@@ -7,11 +7,10 @@ import (
 
 func TestRusage(t *testing.T){
 	var x ServerStat
-	a, b := x.rusage(0)
+	a, b, c, d := x.rusage()
 	fmt.Println(a, b)
-	a, b = x.rusage(1)
-	fmt.Println(a, b)
-	if a == 0 && b == 0 || b >= 1000000 {
+	fmt.Println(c, d)
+	if a == 0 && b == 0 || b >= 1000000 || c == 0 && d == 0 || d >= 1000000 {
 		t.Fatalf("Unexpected returned values")
 	}
 }

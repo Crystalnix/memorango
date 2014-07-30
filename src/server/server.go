@@ -25,6 +25,8 @@ tools/cache - contains structs and methods for data storage
 
 tools/protocol - contains methods and rules for handling requests.
 
+tools/stat - contains struct for keeping information about server, its actions and its condition.
+
 */
 package server
 
@@ -39,6 +41,8 @@ import (
 	"errors"
 	"math/rand"
 	"time"
+	statistic "tools/stat"
+	//"os"
 )
 
 const (
@@ -54,6 +58,7 @@ type server struct {
 	socket net.Listener
 	connections map[string] net.Conn
 	storage *cache.LRUCache
+	Stat *statistic.ServerStat
 }
 
 // Private method of server structure, which starts to listen connection, cache it and delegate it to dispatcher.
@@ -79,6 +84,8 @@ func (server *server) run() {
 		} else {
 			// handle the connection
 			server.connections[connection.RemoteAddr().String()] = connection
+			server.Stat.Current_connections ++
+			server.Stat.Total_connections ++
 			go server.dispatch(connection.RemoteAddr().String())
 		}
 	}
@@ -96,6 +103,7 @@ func (server *server) stop() {
 		}
 	}
 	server.connections = nil
+	server.Stat = nil
 	if server.socket != nil {
   		err := server.socket.Close()
 		if err != nil {
@@ -114,7 +122,7 @@ func (server *server) stop() {
 // The process turns in loop until whether input stream will get an EOF or an error will be occurred.
 // In the last case it will be return some error message to a client.
 // Anyway, at the end connection will be broken up.
-func (server *server) dispatch(address string) {
+func (server *server) dispatch(address string) {  //TODO: New tests
 
 	fmt.Println("Retrieving connection's data from ", address)
 	connection := server.connections[address]
@@ -123,6 +131,7 @@ func (server *server) dispatch(address string) {
 	for {
 		// let's read a header first
 		received_message, n, err := readRequest(connectionReader, -1)
+		server.Stat.Read_bytes += uint64(n)
 		fmt.Println("Connection stream was read.")
 		if err != nil {
 			if err == io.EOF {
@@ -136,16 +145,18 @@ func (server *server) dispatch(address string) {
 			}
 		} else {
 			// Here the message should be handled
-			parsed_request := protocol.ParseProtocolHeader(string(received_message[0 : n - 2]))
+			parsed_request := protocol.ParseProtocolHeader(string(received_message[ : n - 2]))
 			fmt.Println("Header: ", parsed_request)
-			received_message, n, err := readRequest(connectionReader, parsed_request.DataLen())
-			fmt.Println("Data: ", received_message)
-			if err != nil {
-				server.breakConnection(connection)
-				break
+			if parsed_request.DataLen() > 0 {
+				received_message, n, err := readRequest(connectionReader, parsed_request.DataLen())
+				fmt.Println("Data length / read: ", len(received_message), n)
+				if err != nil {
+					server.breakConnection(connection)
+					break
+				}
+				parsed_request.SetData(received_message[0 : ])
 			}
-			parsed_request.SetData(received_message, n - 2)
-			response_message, err := parsed_request.HandleRequest(server.storage)
+			response_message, err := parsed_request.HandleRequest(server.storage, server.Stat)
 			fmt.Println("Server is sending response:\n", string(response_message[0 : len(response_message)]))
 			// if there is no flag "noreply" in the header:
 			if parsed_request.Reply() {
@@ -182,13 +193,12 @@ func readRequest(reader *bufio.Reader, length int) ([]byte, int, error){
 		counter ++
 		if length == -1 || counter - 2 == length {
 			if read == '\n' && prev_symbol == '\r' {
-				break
+				return buffer[ : len(buffer) - 2], counter, nil
 			} else {
 				if length != -1 {
 					return buffer, counter, errors.New("Length was achieved, but terminator wasn't met.")
 				}
 			}
-
 		}
 		if read != ' ' && length == -1 /* in case of header of unknown length */{
 			token_counter ++
@@ -200,8 +210,8 @@ func readRequest(reader *bufio.Reader, length int) ([]byte, int, error){
 		}
 		prev_symbol = read
 	}
-	return buffer, counter, nil
 }
+
 
 // Private method break up the connection, closes it and removes it from cached server's connections.
 func (server *server) breakConnection(connection net.Conn) bool {
@@ -211,6 +221,7 @@ func (server *server) breakConnection(connection net.Conn) bool {
 		fmt.Println("Can't break up connection: ", err)
 		return false
 	}
+	server.Stat.Current_connections --
 	return true
 }
 
@@ -222,6 +233,7 @@ func (server *server) makeResponse(connection net.Conn, response_message []byte,
 		fmt.Println("Error was occured during making response:", err)
 		return server.breakConnection(connection)
 	}
+	server.Stat.Written_bytes += uint64(length)
 	return true
 }
 
@@ -229,18 +241,22 @@ func (server *server) makeResponse(connection net.Conn, response_message []byte,
 // Function receives port string, which uses to open socket at pointed port and int64 value,
 // which uses for limiting of allowed memory to use.
 // Function returns a pointer to server structure with filled and prepared to usage fields.
-func RunServer(port string, bytes_of_memory int64) *server {
+func NewServer(port string, bytes_of_memory int64) *server {
 	server := new(server)
 	server.socket = nil
 	server.port = port
 	server.storage = cache.New(bytes_of_memory)
 	server.connections = make(map[string] net.Conn)
-	go server.run()
+	server.Stat = statistic.New(bytes_of_memory)
 	return server
 }
 
+func (server *server) RunServer() {
+	go server.run()
+}
+
 // Public function receives the pointer to server structure, stops the server and inform about it.
-func StopServer(server *server) {
+func (server *server) StopServer() {
 	server.stop()
 	fmt.Println("Server is stopped.")
 }

@@ -111,6 +111,5 @@ func ToTimeStampFromNow(ts int64) int64 {
 
 // Function generates unique 64 bits integer Cas identificator
 func GenerateCasId() int64 {
-	//rand.Seed(time.Now().UnixNano())
 	return rand.Int63()
 }

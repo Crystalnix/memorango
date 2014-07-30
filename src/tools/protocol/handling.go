@@ -2,6 +2,7 @@ package protocol
 
 import (
 	"tools/cache"
+	"tools/stat"
 	"tools"
 	"strings"
 	"errors"
@@ -12,7 +13,7 @@ import (
 // related to own containment.
 // Returns response to client as byte-string and error/nil.
 // If process was successful, there will be returned nil instead of error, otherwise it will be returned specified error.
-func (enum *Ascii_protocol_enum) HandleRequest(storage *cache.LRUCache) ([]byte, error) {
+func (enum *Ascii_protocol_enum) HandleRequest(storage *cache.LRUCache, stats *stat.ServerStat) ([]byte, error) {
 	fmt.Println("Start handle request: ", enum)
 	var err error
 	if len(enum.error) > 0 {
@@ -46,11 +47,14 @@ func (enum *Ascii_protocol_enum) HandleRequest(storage *cache.LRUCache) ([]byte,
 		result, err = enum.delete(storage)
 	case "flush_all":
 		result, err = enum.flush_all(storage)
+	case "stats":
+		return []byte(enum.stat(storage, stats)), nil
 	case "version":
 		return []byte("VERSION " + tools.VERSION + "\r\n"), nil
 	case "quit":
 		return nil, errors.New("It is not a error")
 	}
+	enum.RecordStats(stats, result)
 	return []byte(result), err
 }
 
@@ -79,7 +83,7 @@ func (enum *Ascii_protocol_enum) add(storage *cache.LRUCache) (string, error) {
 func (enum *Ascii_protocol_enum) pending(storage *cache.LRUCache,
 										 existed_item *cache.LRUCacheItem, pending_data []byte) (string, error) {
 	enum.bytes = len(pending_data)
-	enum.SetData(pending_data, len(pending_data))
+	enum.SetData(pending_data)
 	enum.exptime = existed_item.Exptime
 	enum.cas_unique = existed_item.Cas_unique
 	enum.flags = existed_item.Flags
@@ -125,11 +129,11 @@ func (enum *Ascii_protocol_enum) replace(storage *cache.LRUCache) (string, error
 func (enum *Ascii_protocol_enum) cas(storage *cache.LRUCache) (string, error) {
 	existed_item := storage.Get(enum.key[0])
 	if existed_item != nil {
-		if existed_item.Cas_unique != enum.cas_unique || existed_item.Cas_unique == 0{
-			return NOT_FOUND, nil
+		if existed_item.Cas_unique == enum.cas_unique && existed_item.Cas_unique != 0{
+			return enum.set(storage)
 		}
 	}
-	return enum.set(storage)
+	return NOT_FOUND, nil
 }
 
 // Retrieving commands
@@ -212,6 +216,16 @@ func (enum *Ascii_protocol_enum) fold(storage *cache.LRUCache, sign int) (string
 	return NOT_FOUND, nil
 }
 
+// Implements fetching of statistic without arguments.
+// TODO: to include arguments support through enum.key[...]
+func (enum *Ascii_protocol_enum) stat(storage *cache.LRUCache, stats *stat.ServerStat) string {
+	var result = ""
+	for key, value := range stats.Serialize(storage){
+		result += "STAT " + key + " " + value + "\r\n"
+	}
+	return result + "END\r\n"
+}
+
 // Utilities
 
 // Returns true if there was no "noreply" param in request.
@@ -225,10 +239,33 @@ func (enum *Ascii_protocol_enum) DataLen() int {
 }
 
 // Sets data byte-string of specified length to enumeration.
-func (enum *Ascii_protocol_enum) SetData(data []byte, length int) bool {
-	if enum.bytes == length {
-		enum.data_string = data[0 : length]
+func (enum *Ascii_protocol_enum) SetData(data []byte) bool {
+	if enum.bytes == len(data) {
+		enum.data_string = data[0 : ]
 		return true
 	}
 	return false
+}
+
+
+// Function checks was the passed param res successful whether not.
+func IsMissed(res string) bool {
+	return (res == NOT_FOUND || res == ERROR_TEMP || res == "END\r\n")
+}
+
+// Function increases fields of passed structure stats, if some of commands or passed param res were matched to required.
+func (enum *Ascii_protocol_enum) RecordStats(stats *stat.ServerStat, res string) {
+	if tools.In(enum.command, []string{"get", "set", "delete", "touch", }){
+		stats.Commands["cmd_" + enum.command] ++
+	}
+	if tools.In(enum.command, []string{"get", "delete", "incr", "decr", "cas", "touch", }){
+		if IsMissed(res){
+			stats.Commands[enum.command + "_misses"] ++
+		} else {
+			stats.Commands[enum.command + "_hits"] ++
+		}
+	}
+	if enum.command == "cas" && res == NOT_FOUND {
+		stats.Commands["cas_badval"] ++
+	}
 }
