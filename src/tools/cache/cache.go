@@ -33,6 +33,7 @@ type LRUCacheStat struct {
 	Evicted_unfetched uint64
 	Current_items int
 	Total_items int64
+	Crawler_reclaimed int64
 }
 
 // Implementation of LRUCache itself.
@@ -48,6 +49,15 @@ type LRUCache struct {
 func (c *LRUCache) promote(item *LRUCacheItem) {
 	item.touched = true
 	c.list.MoveToFront(item.listElement)
+}
+
+// Method returns amount of 1MiB slabs stored in cache.
+func (c *LRUCache) slabs_number() int {
+	amount := c.list.Len() / SLAB_SIZE
+	if c.list.Len() % SLAB_SIZE != 0 {
+		 amount ++
+	}
+	return amount
 }
 
 // Private method of LRUCache for releasing of memory.
@@ -168,11 +178,11 @@ func (c *LRUCache) Capacity() int64 {
 // Function returns pointer to created instance or nil if capacity is invalid.
 func New(capacity int64 /* bytes */) *LRUCache {
 	if capacity <= 0 { return nil }
-	return &LRUCache{
+	return &LRUCache {
 		capacity: capacity,
 		items: make(map[string] *LRUCacheItem, 10000),
 		list: list.New(),
-		Stats: &LRUCacheStat{capacity, 0, 0, 0, 0, 0},
+		Stats: &LRUCacheStat{capacity, 0, 0, 0, 0, 0, 0},
 	}
 }
 

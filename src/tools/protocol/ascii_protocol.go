@@ -20,7 +20,7 @@ const (
 // Specified groups of commands, which are helpful for destination handling of request.
 var storage_commands = []string{"set", "add", "replace", "append", "prepend", "cas",}
 var retrieve_commands = []string{"get", "gets",}
-var other_commands = []string{"delete", "touch", "flush_all", "version", "quit", "incr", "decr", "stats", }
+var other_commands = []string{"delete", "touch", "flush_all", "version", "quit", "incr", "decr", "stats", "lru_crawler"}
 
 // Enumeration of protocol tokens.
 type Ascii_protocol_enum struct {
