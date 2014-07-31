@@ -15,8 +15,9 @@ var test_address = "127.0.0.1:" + test_port
 func TestServerRunAndStop(t *testing.T){
 //	var test_port = "60000"
 //	var test_address = "127.0.0.1:" + test_port
-	srv := RunServer(test_port, 1024)
-	time.Sleep(time.Millisecond * time.Duration(5)) // Let's wait a bit while goroutines will start
+	srv := NewServer(test_port, 1024)
+	srv.RunServer()
+	time.Sleep(time.Millisecond * time.Duration(10)) // Let's wait a bit while goroutines will start
 	connection, err := net.Dial("tcp", test_address)
 	if err != nil {
 		t.Fatalf("Server wasn't run: %s", err)
@@ -36,9 +37,8 @@ func TestServerRunAndStop(t *testing.T){
 		t.Fatalf("Server doesn't response.")
 	}
 	fmt.Println("Response: ", string(response))
-	StopServer(srv)
+	srv.StopServer()
 	connection.Close()
-	time.Sleep(time.Millisecond * time.Duration(5)) // let's wait a bit while all goroutines will finish
 	connection, err = net.Dial("tcp", test_address)
 	if err == nil {
 		t.Fatalf("Server is still running at %s", test_address)
@@ -48,9 +48,10 @@ func TestServerRunAndStop(t *testing.T){
 func TestServerConsistenceAndConnections(t *testing.T){
 //	var test_port = "60001"
 //	var test_address = "127.0.0.1:" + test_port
-	srv := RunServer(test_port, 1024)
+	srv := NewServer(test_port, 1024)
+	srv.RunServer()
 	time.Sleep(time.Millisecond * time.Duration(10))
-	defer StopServer(srv)
+	defer srv.StopServer()
 	connection, err := net.Dial("tcp", test_address)
 	// notice, that connection can be opened in case of failure.
 	if err != nil {
@@ -78,9 +79,10 @@ func TestServerConsistenceAndConnections(t *testing.T){
 func TestServerResponseAndConnections(t *testing.T){
 //	var test_port = "60002"
 //	var test_address = "127.0.0.1:" + test_port
-	srv := RunServer(test_port, 1024)
+	srv := NewServer(test_port, 1024)
+	srv.RunServer()
 	time.Sleep(time.Millisecond * time.Duration(10))
-	defer StopServer(srv)
+	defer srv.StopServer()
 	connection, err := net.Dial("tcp", test_address)
 	var test_msg = []byte("Test1\r\n")
 	_, err = connection.Write(test_msg)

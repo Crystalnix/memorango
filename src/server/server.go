@@ -42,7 +42,7 @@ import (
 	"math/rand"
 	"time"
 	statistic "tools/stat"
-	//"os"
+	"sync"
 )
 
 const (
@@ -59,10 +59,13 @@ type server struct {
 	connections map[string] net.Conn
 	storage *cache.LRUCache
 	Stat *statistic.ServerStat
+	threadSync sync.WaitGroup
 }
 
 // Private method of server structure, which starts to listen connection, cache it and delegate it to dispatcher.
 func (server *server) run() {
+	server.threadSync.Add(1)
+	defer server.threadSync.Done()
 	rand.Seed(time.Now().Unix())
 	listener, err := net.Listen("tcp", ":" + server.port)
 	if err != nil {
@@ -93,8 +96,6 @@ func (server *server) run() {
 
 // Private method of server struct, which closes socket listener and stops serving.
 func (server *server) stop() {
-	server.storage.FlushAll()
-	server.storage = nil
 	for address, connection := range server.connections {
 		if server.breakConnection(connection) {
 			fmt.Println("Closed connection at", address)
@@ -102,8 +103,6 @@ func (server *server) stop() {
 			fmt.Println("Can't close connection at", address)
 		}
 	}
-	server.connections = nil
-	server.Stat = nil
 	if server.socket != nil {
   		err := server.socket.Close()
 		if err != nil {
@@ -113,6 +112,12 @@ func (server *server) stop() {
 	} else {
 		log.Fatal("Server can't be stoped, because socket is undefined.")
 	}
+	fmt.Println("Waiting for goroutines...")
+	server.threadSync.Wait() // Waiting for all goroutines while done their jobs.
+	server.storage.FlushAll()
+	server.storage = nil
+	server.connections = nil
+	server.Stat = nil
 }
 
 // Private method of server, which dispatches active incoming connection.
@@ -123,7 +128,8 @@ func (server *server) stop() {
 // In the last case it will be return some error message to a client.
 // Anyway, at the end connection will be broken up.
 func (server *server) dispatch(address string) {  //TODO: New tests
-
+	server.threadSync.Add(1)
+	defer server.threadSync.Done()
 	fmt.Println("Retrieving connection's data from ", address)
 	connection := server.connections[address]
 	connectionReader := bufio.NewReader(connection)
@@ -131,7 +137,7 @@ func (server *server) dispatch(address string) {  //TODO: New tests
 	for {
 		// let's read a header first
 		received_message, n, err := readRequest(connectionReader, -1)
-		server.Stat.Read_bytes += uint64(n)
+
 		fmt.Println("Connection stream was read.")
 		if err != nil {
 			if err == io.EOF {
@@ -145,6 +151,7 @@ func (server *server) dispatch(address string) {  //TODO: New tests
 			}
 		} else {
 			// Here the message should be handled
+			server.Stat.Read_bytes += uint64(n)
 			parsed_request := protocol.ParseProtocolHeader(string(received_message[ : n - 2]))
 			fmt.Println("Header: ", parsed_request)
 			if parsed_request.DataLen() > 0 {
@@ -215,6 +222,9 @@ func readRequest(reader *bufio.Reader, length int) ([]byte, int, error){
 
 // Private method break up the connection, closes it and removes it from cached server's connections.
 func (server *server) breakConnection(connection net.Conn) bool {
+	if server.socket == nil{
+		return false
+	}
 	delete(server.connections, connection.RemoteAddr().String())
 	err := connection.Close()
 	if err != nil {

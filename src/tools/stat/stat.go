@@ -26,8 +26,7 @@ type ServerStat struct {
 	Commands map[string] uint64
 }
 
-// TODO: Tests for everything.
-
+// Function initialize ServerStat structure by required start parameters.
 func New(memory_amount int64) *ServerStat {
 	return &ServerStat{
 		pid: os.Getpid(),
@@ -71,10 +70,12 @@ func (s *ServerStat) bytes(capacity int64) int64 {
 	return int64(s.limit_maxbytes) - capacity
 }
 
+// Function returns number of active goroutines for current process
 func (s *ServerStat) threads() int {
 	return runtime.NumGoroutine()
 }
 
+// Function serialize statistic of server and storage and returns it as map of strings
 func (s *ServerStat) Serialize(storage *cache.LRUCache) map[string] string {
 	dict := make(map[string] string)
 	dict["pid"] = tools.IntToString(int64(s.pid))

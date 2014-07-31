@@ -11,6 +11,8 @@ import (
 
 // Public method of Ascii_protocol_enum operates with received storage: retrieves, discards, sets or updates items,
 // related to own containment.
+// Also, function receives stats structure, which possibly may be a nil. This structure serves for recording statistic
+// of processing request.
 // Returns response to client as byte-string and error/nil.
 // If process was successful, there will be returned nil instead of error, otherwise it will be returned specified error.
 func (enum *Ascii_protocol_enum) HandleRequest(storage *cache.LRUCache, stats *stat.ServerStat) ([]byte, error) {
@@ -48,13 +50,19 @@ func (enum *Ascii_protocol_enum) HandleRequest(storage *cache.LRUCache, stats *s
 	case "flush_all":
 		result, err = enum.flush_all(storage)
 	case "stats":
-		return []byte(enum.stat(storage, stats)), nil
+		if stats != nil {
+			return []byte(enum.stat(storage, stats)), nil
+		} else {
+			return nil, errors.New("Statistic is not supported.")
+		}
 	case "version":
 		return []byte("VERSION " + tools.VERSION + "\r\n"), nil
 	case "quit":
-		return nil, errors.New("It is not a error")
+		return nil, errors.New("Exit.")
 	}
-	enum.RecordStats(stats, result)
+	if stats != nil {
+		enum.RecordStats(stats, result)
+	}
 	return []byte(result), err
 }
 

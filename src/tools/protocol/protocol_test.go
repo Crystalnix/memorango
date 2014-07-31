@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 	"tools/cache"
+	"tools/stat"
 	"tools"
 )
 
@@ -289,6 +290,10 @@ func TestParsingSuiteOther(t *testing.T){
 		"quit", nil, 0, 0, 0, 0, nil, false, "") {
 		t.Fatalf("The parser works incorrect.")
 	}
+	if !matchEnumFields(ParseProtocolHeader("stats"),
+		"stats", []string{}, 0, 0, 0, 0, nil, false, "") {
+		t.Fatalf("The parser works incorrect.")
+	}
 }
 
 func TestParsingErrors(t *testing.T){
@@ -342,14 +347,14 @@ func TestEnumDataLen(t *testing.T){
 
 func TestEnumSetData1(t *testing.T){
 	var testEnum = Ascii_protocol_enum{"set", []string{"key", }, 1, 0, 42, 0, true, nil, ""}
-	if !testEnum.SetData(make([]byte, 42), 42){
+	if !testEnum.SetData(make([]byte, 42)){
 		t.Fatalf("Wrong behavior of SetData() function.")
 	}
 }
 
 func TestEnumSetData2(t *testing.T){
 	var testEnum = Ascii_protocol_enum{"set", []string{"key", }, 1, 0, 42, 0, true, nil, ""}
-	if testEnum.SetData(make([]byte, 41), 41){
+	if testEnum.SetData(make([]byte, 41)){
 		t.Fatalf("Wrong behavior of SetData() function.")
 	}
 }
@@ -357,7 +362,7 @@ func TestEnumSetData2(t *testing.T){
 func TestHandlingSuiteSet1(t *testing.T){
 	var storage = cache.New(42)
 	var testEnum = Ascii_protocol_enum{"set", []string{"key", }, 1, 0, 4, 0, false, []byte("TEST"), ""}
-	res, err := testEnum.HandleRequest(storage)
+	res, err := testEnum.HandleRequest(storage, nil)
 	if err != nil || string(res) != "STORED\r\n" {
 		t.Fatalf("Unexpected returned values of handling: ", err, res)
 	}
@@ -366,7 +371,7 @@ func TestHandlingSuiteSet1(t *testing.T){
 func TestHandlingSuiteSet2(t *testing.T){
 	var storage = cache.New(4)
 	var testEnum = Ascii_protocol_enum{"set", []string{"key", }, 1, 0, 42, 0, false, make([]byte, 42), ""}
-	res, err := testEnum.HandleRequest(storage)
+	res, err := testEnum.HandleRequest(storage, nil)
 	if err == nil || string(res) != strings.Replace(SERVER_ERROR_TEMP, "%s", "Not enough memory", 1) {
 		t.Fatalf("Unexpected returned values of handling: ", err, res)
 	}
@@ -378,7 +383,7 @@ func TestHandlingSuiteCas1(t *testing.T){
 		t.Fatalf("Unexpecting behavior ")
 	}
 	var testEnum = Ascii_protocol_enum{"cas", []string{"key", }, 1, 0, 5, 424242, false, []byte("TEST2"), ""}
-	res, err := testEnum.HandleRequest(storage)
+	res, err := testEnum.HandleRequest(storage, nil)
 	if err != nil || string(res) != "STORED\r\n" {
 		t.Fatalf("Unexpected returned values of handling: ", err, res)
 	}
@@ -390,7 +395,7 @@ func TestHandlingSuiteCas2(t *testing.T){
 		t.Fatalf("Unexpecting behavior ")
 	}
 	var testEnum = Ascii_protocol_enum{"cas", []string{"key", }, 1, 0, 42, 424242, false, make([]byte, 42), ""}
-	res, err := testEnum.HandleRequest(storage)
+	res, err := testEnum.HandleRequest(storage, nil)
 	if err != nil || string(res) != NOT_FOUND {
 		t.Fatalf("Unexpected returned values of handling: ", err, res)
 	}
@@ -399,12 +404,12 @@ func TestHandlingSuiteCas2(t *testing.T){
 func TestHandlingSuiteAdd1(t *testing.T){
 	var storage = cache.New(42)
 	var testEnum = Ascii_protocol_enum{"set", []string{"key", }, 1, 0, 4, 0, false, []byte("TEST"), ""}
-	res, err := testEnum.HandleRequest(storage)
+	res, err := testEnum.HandleRequest(storage, nil)
 	if err != nil || string(res) != "STORED\r\n" {
 		t.Fatalf("Unexpected returned values of handling: ", err, res)
 	}
 	testEnum = Ascii_protocol_enum{"add", []string{"key1", }, 0, 0, 4, 0, false, []byte("TEST"), ""}
-	res, err = testEnum.HandleRequest(storage)
+	res, err = testEnum.HandleRequest(storage, nil)
 	if err != nil || string(res) != "STORED\r\n" {
 		t.Fatalf("Unexpected returned values of handling: ", err, res)
 	}
@@ -413,12 +418,12 @@ func TestHandlingSuiteAdd1(t *testing.T){
 func TestHandlingSuiteAdd2(t *testing.T){
 	var storage = cache.New(42)
 	var testEnum = Ascii_protocol_enum{"set", []string{"key", }, 1, 0, 22, 0, false, make([]byte, 22), ""}
-	res, err := testEnum.HandleRequest(storage)
+	res, err := testEnum.HandleRequest(storage, nil)
 	if err != nil || string(res) != "STORED\r\n" {
 		t.Fatalf("Unexpected returned values of handling: ", err, res)
 	}
 	testEnum = Ascii_protocol_enum{"add", []string{"key", }, 0, 0, 5, 0, false, []byte("TEST2"), ""}
-	res, err = testEnum.HandleRequest(storage)
+	res, err = testEnum.HandleRequest(storage, nil)
 	if err != nil || string(res) != "NOT_STORED\r\n" {
 		t.Fatalf("Unexpected returned values of handling: ", err, res)
 	}
@@ -427,12 +432,12 @@ func TestHandlingSuiteAdd2(t *testing.T){
 func TestHandlingSuiteReplace1(t *testing.T){
 	var storage = cache.New(42)
 	var testEnum = Ascii_protocol_enum{"set", []string{"key", }, 1, 0, 4, 0, false, []byte("TEST"), ""}
-	res, err := testEnum.HandleRequest(storage)
+	res, err := testEnum.HandleRequest(storage, nil)
 	if err != nil || string(res) != "STORED\r\n" {
 		t.Fatalf("Unexpected returned values of handling: ", err, res)
 	}
 	testEnum = Ascii_protocol_enum{"replace", []string{"key1", }, 0, 0, 4, 0, false, []byte("TEST"), ""}
-	res, err = testEnum.HandleRequest(storage)
+	res, err = testEnum.HandleRequest(storage, nil)
 	if err != nil || string(res) != "NOT_STORED\r\n" {
 		t.Fatalf("Unexpected returned values of handling: ", err, res)
 	}
@@ -441,12 +446,12 @@ func TestHandlingSuiteReplace1(t *testing.T){
 func TestHandlingSuiteReplace2(t *testing.T){
 	var storage = cache.New(42)
 	var testEnum = Ascii_protocol_enum{"set", []string{"key", }, 1, 0, 42, 0, false, make([]byte, 42), ""}
-	res, err := testEnum.HandleRequest(storage)
+	res, err := testEnum.HandleRequest(storage, nil)
 	if err != nil || string(res) != "STORED\r\n" {
 		t.Fatalf("Unexpected returned values of handling: ", err, res)
 	}
 	testEnum = Ascii_protocol_enum{"replace", []string{"key", }, 0, 0, 5, 0, false, []byte("TEST2"), ""}
-	res, err = testEnum.HandleRequest(storage)
+	res, err = testEnum.HandleRequest(storage, nil)
 	if err != nil || string(res) != "STORED\r\n" {
 		t.Fatalf("Unexpected returned values of handling: ", err, res)
 	}
@@ -455,12 +460,12 @@ func TestHandlingSuiteReplace2(t *testing.T){
 func TestHandlingSuiteAppend1(t *testing.T){
 	var storage = cache.New(42)
 	var testEnum = Ascii_protocol_enum{"set", []string{"key", }, 1, 0, 4, 0, false, []byte("TEST"), ""}
-	res, err := testEnum.HandleRequest(storage)
+	res, err := testEnum.HandleRequest(storage, nil)
 	if err != nil || string(res) != "STORED\r\n" {
 		t.Fatalf("Unexpected returned values of handling: ", err, res)
 	}
 	testEnum = Ascii_protocol_enum{"append", []string{"key1", }, 0, 0, 4, 0, false, []byte("TEST"), ""}
-	res, err = testEnum.HandleRequest(storage)
+	res, err = testEnum.HandleRequest(storage, nil)
 	if err != nil || string(res) != "NOT_STORED\r\n" {
 		t.Fatalf("Unexpected returned values of handling: ", err, res)
 	}
@@ -469,12 +474,12 @@ func TestHandlingSuiteAppend1(t *testing.T){
 func TestHandlingSuiteAppend2(t *testing.T){
 	var storage = cache.New(42)
 	var testEnum = Ascii_protocol_enum{"set", []string{"key", }, 1, 0, 4, 0, false, []byte("TEST"), ""}
-	res, err := testEnum.HandleRequest(storage)
+	res, err := testEnum.HandleRequest(storage, nil)
 	if err != nil || string(res) != "STORED\r\n" {
 		t.Fatalf("Unexpected returned values of handling: ", err, res)
 	}
 	testEnum = Ascii_protocol_enum{"append", []string{"key", }, 0, 0, 5, 0, false, []byte("TEST2"), ""}
-	res, err = testEnum.HandleRequest(storage)
+	res, err = testEnum.HandleRequest(storage, nil)
 	if err != nil || string(res) != "STORED\r\n" {
 		t.Fatalf("Unexpected returned values of handling: ", err, res)
 	}
@@ -487,12 +492,12 @@ func TestHandlingSuiteAppend2(t *testing.T){
 func TestHandlingSuitePrepend1(t *testing.T){
 	var storage = cache.New(42)
 	var testEnum = Ascii_protocol_enum{"set", []string{"key", }, 1, 0, 4, 0, false, []byte("TEST"), ""}
-	res, err := testEnum.HandleRequest(storage)
+	res, err := testEnum.HandleRequest(storage, nil)
 	if err != nil || string(res) != "STORED\r\n" {
 		t.Fatalf("Unexpected returned values of handling: ", err, res)
 	}
 	testEnum = Ascii_protocol_enum{"prepend", []string{"key1", }, 0, 0, 4, 0, false, []byte("TEST"), ""}
-	res, err = testEnum.HandleRequest(storage)
+	res, err = testEnum.HandleRequest(storage, nil)
 	if err != nil || string(res) != "NOT_STORED\r\n" {
 		t.Fatalf("Unexpected returned values of handling: ", err, res)
 	}
@@ -501,12 +506,12 @@ func TestHandlingSuitePrepend1(t *testing.T){
 func TestHandlingSuitePrepend2(t *testing.T){
 	var storage = cache.New(42)
 	var testEnum = Ascii_protocol_enum{"set", []string{"key", }, 1, 0, 4, 0, false, []byte("TEST"), ""}
-	res, err := testEnum.HandleRequest(storage)
+	res, err := testEnum.HandleRequest(storage, nil)
 	if err != nil || string(res) != "STORED\r\n" {
 		t.Fatalf("Unexpected returned values of handling: ", err, res)
 	}
 	testEnum = Ascii_protocol_enum{"prepend", []string{"key", }, 0, 0, 5, 0, false, []byte("TEST2"), ""}
-	res, err = testEnum.HandleRequest(storage)
+	res, err = testEnum.HandleRequest(storage, nil)
 	if err != nil || string(res) != "STORED\r\n" {
 		t.Fatalf("Unexpected returned values of handling: ", err, res)
 	}
@@ -519,9 +524,9 @@ func TestHandlingSuitePrepend2(t *testing.T){
 func TestHandlingSuiteGet1(t *testing.T){
 	var storage = cache.New(42)
 	var testEnum = Ascii_protocol_enum{"set", []string{"key", }, 1, 0, 4, 0, false, []byte("TEST"), ""}
-	res, err := testEnum.HandleRequest(storage)
+	res, err := testEnum.HandleRequest(storage, nil)
 	testEnum = Ascii_protocol_enum{"get", []string{"key", }, 0, 0, 0, 0, false, nil, ""}
-	res, err = testEnum.HandleRequest(storage)
+	res, err = testEnum.HandleRequest(storage, nil)
 	if err != nil || string(res) != "VALUE key 1 4\r\nTEST\r\nEND\r\n" {
 		t.Fatalf("Unexpected returned values of handling: ", err, res)
 	}
@@ -530,9 +535,9 @@ func TestHandlingSuiteGet1(t *testing.T){
 func TestHandlingSuiteGet2(t *testing.T){
 	var storage = cache.New(42)
 	var testEnum = Ascii_protocol_enum{"set", []string{"key", }, 1, 0, 4, 0, false, []byte("TEST"), ""}
-	res, err := testEnum.HandleRequest(storage)
+	res, err := testEnum.HandleRequest(storage, nil)
 	testEnum = Ascii_protocol_enum{"get", []string{"not_key", }, 0, 0, 0, 0, false, nil, ""}
-	res, err = testEnum.HandleRequest(storage)
+	res, err = testEnum.HandleRequest(storage, nil)
 	if err != nil || string(res) != "END\r\n" {
 		t.Fatalf("Unexpected returned values of handling: ", err, res)
 	}
@@ -541,9 +546,9 @@ func TestHandlingSuiteGet2(t *testing.T){
 func TestHandlingSuiteGets1(t *testing.T){
 	var storage = cache.New(42)
 	var testEnum = Ascii_protocol_enum{"set", []string{"key", }, 1, 0, 4, 0, false, []byte("TEST"), ""}
-	res, err := testEnum.HandleRequest(storage)
+	res, err := testEnum.HandleRequest(storage, nil)
 	testEnum = Ascii_protocol_enum{"gets", []string{"key", }, 0, 0, 0, 0, false, nil, ""}
-	res, err = testEnum.HandleRequest(storage)
+	res, err = testEnum.HandleRequest(storage, nil)
 	item := storage.Get("key")
 	if item == nil {
 		t.Fatalf("Item wasn't stored")
@@ -561,9 +566,9 @@ func TestHandlingSuiteGets1(t *testing.T){
 func TestHandlingSuiteGets2(t *testing.T){
 	var storage = cache.New(42)
 	var testEnum = Ascii_protocol_enum{"set", []string{"key", }, 1, 0, 4, 0, false, []byte("TEST"), ""}
-	res, err := testEnum.HandleRequest(storage)
+	res, err := testEnum.HandleRequest(storage, nil)
 	testEnum = Ascii_protocol_enum{"gets", []string{"not_key", }, 0, 0, 0, 0, false, nil, ""}
-	res, err = testEnum.HandleRequest(storage)
+	res, err = testEnum.HandleRequest(storage, nil)
 	if err != nil || string(res) != "END\r\n" {
 		t.Fatalf("Unexpected returned values of handling: ", err, res)
 	}
@@ -572,11 +577,11 @@ func TestHandlingSuiteGets2(t *testing.T){
 func TestHandlingSuiteGetMultiple(t *testing.T){
 	var storage = cache.New(42)
 	var testEnum = Ascii_protocol_enum{"set", []string{"key1", }, 1, 0, 4, 0, false, []byte("TEST"), ""}
-	testEnum.HandleRequest(storage)
+	testEnum.HandleRequest(storage, nil)
 	testEnum = Ascii_protocol_enum{"set", []string{"key2", }, 1, 0, 4, 0, false, []byte("TEST"), ""}
-	testEnum.HandleRequest(storage)
+	testEnum.HandleRequest(storage, nil)
 	testEnum = Ascii_protocol_enum{"get", []string{"key1", "key2", }, 0, 0, 0, 0, false, nil, ""}
-	res, err := testEnum.HandleRequest(storage)
+	res, err := testEnum.HandleRequest(storage, nil)
 	if err != nil || string(res) != "VALUE key1 1 4\r\nTEST\r\nVALUE key2 1 4\r\nTEST\r\nEND\r\n" {
 		t.Fatalf("Unexpected returned values of handling: ", err, res)
 	}
@@ -585,14 +590,14 @@ func TestHandlingSuiteGetMultiple(t *testing.T){
 func TestHandlingSuiteIncrDecr1(t *testing.T){
 	var storage = cache.New(42)
 	var testEnum = Ascii_protocol_enum{"set", []string{"key", }, 1, 0, 3, 0, false, []byte("123"), ""}
-	testEnum.HandleRequest(storage)
+	testEnum.HandleRequest(storage, nil)
 	testEnum = Ascii_protocol_enum{"incr", []string{"key", }, 0, 0, 0, 0, false, []byte("100"), ""}
-	res, err := testEnum.HandleRequest(storage)
+	res, err := testEnum.HandleRequest(storage, nil)
 	if err != nil || string(res) != "223\r\n" {
 		t.Fatalf("Unexpected returned values of handling: ", err, string(res))
 	}
 	testEnum = Ascii_protocol_enum{"decr", []string{"key", }, 0, 0, 0, 0, false, []byte("100"), ""}
-	res, err = testEnum.HandleRequest(storage)
+	res, err = testEnum.HandleRequest(storage, nil)
 	if err != nil || string(res) != "123\r\n" {
 		t.Fatalf("Unexpected returned values of handling: ", err, string(res))
 	}
@@ -601,14 +606,14 @@ func TestHandlingSuiteIncrDecr1(t *testing.T){
 func TestHandlingSuiteIncrDecr2(t *testing.T){
 	var storage = cache.New(42)
 	var testEnum = Ascii_protocol_enum{"set", []string{"key", }, 1, 0, 6, 0, false, []byte("3.1459"), ""}
-	testEnum.HandleRequest(storage)
+	testEnum.HandleRequest(storage, nil)
 	testEnum = Ascii_protocol_enum{"incr", []string{"key", }, 0, 0, 0, 0, false, []byte("100"), ""}
-	res, err := testEnum.HandleRequest(storage)
+	res, err := testEnum.HandleRequest(storage, nil)
 	if err != nil || string(res) != "ERROR\r\n" {
 		t.Fatalf("Unexpected returned values of handling: ", err, string(res))
 	}
 	testEnum = Ascii_protocol_enum{"decr", []string{"key1", }, 0, 0, 0, 0, false, []byte("100"), ""}
-	res, err = testEnum.HandleRequest(storage)
+	res, err = testEnum.HandleRequest(storage, nil)
 	if err != nil || string(res) != "NOT_FOUND\r\n" {
 		t.Fatalf("Unexpected returned values of handling: ", err, string(res))
 	}
@@ -617,9 +622,9 @@ func TestHandlingSuiteIncrDecr2(t *testing.T){
 func TestHandlingSuiteTouch1(t *testing.T){
 	var storage = cache.New(42)
 	var testEnum = Ascii_protocol_enum{"set", []string{"key", }, 1, 0, 4, 0, false, []byte("TEST"), ""}
-	testEnum.HandleRequest(storage)
+	testEnum.HandleRequest(storage, nil)
 	testEnum = Ascii_protocol_enum{"touch", []string{"key", }, 0, 0, 0, 0, false, nil, ""}
-	res, err := testEnum.HandleRequest(storage)
+	res, err := testEnum.HandleRequest(storage, nil)
 	if err != nil || string(res) != "TOUCHED\r\n" {
 		t.Fatalf("Unexpected returned values of handling: ", err, res)
 	}
@@ -628,9 +633,9 @@ func TestHandlingSuiteTouch1(t *testing.T){
 func TestHandlingSuiteTouch2(t *testing.T){
 	var storage = cache.New(42)
 	var testEnum = Ascii_protocol_enum{"set", []string{"key", }, 1, 0, 4, 0, false, []byte("TEST"), ""}
-	testEnum.HandleRequest(storage)
+	testEnum.HandleRequest(storage, nil)
 	testEnum = Ascii_protocol_enum{"touch", []string{"not_key", }, 0, 0, 0, 0, false, nil, ""}
-	res, err := testEnum.HandleRequest(storage)
+	res, err := testEnum.HandleRequest(storage, nil)
 	if err != nil || string(res) != NOT_FOUND {
 		t.Fatalf("Unexpected returned values of handling: ", err, res)
 	}
@@ -639,9 +644,9 @@ func TestHandlingSuiteTouch2(t *testing.T){
 func TestHandlingSuiteDelete1(t *testing.T){
 	var storage = cache.New(42)
 	var testEnum = Ascii_protocol_enum{"set", []string{"key", }, 1, 0, 4, 0, false, []byte("TEST"), ""}
-	testEnum.HandleRequest(storage)
+	testEnum.HandleRequest(storage, nil)
 	testEnum = Ascii_protocol_enum{"delete", []string{"key", }, 0, 0, 0, 0, false, nil, ""}
-	res, err := testEnum.HandleRequest(storage)
+	res, err := testEnum.HandleRequest(storage, nil)
 	if err != nil || string(res) != "DELETED\r\n" {
 		t.Fatalf("Unexpected returned values of handling: ", err, res)
 	}
@@ -650,9 +655,9 @@ func TestHandlingSuiteDelete1(t *testing.T){
 func TestHandlingSuiteDelete2(t *testing.T){
 	var storage = cache.New(42)
 	var testEnum = Ascii_protocol_enum{"set", []string{"key", }, 1, 0, 4, 0, false, []byte("TEST"), ""}
-	testEnum.HandleRequest(storage)
+	testEnum.HandleRequest(storage, nil)
 	testEnum = Ascii_protocol_enum{"delete", []string{"not_key", }, 0, 0, 0, 0, false, nil, ""}
-	res, err := testEnum.HandleRequest(storage)
+	res, err := testEnum.HandleRequest(storage, nil)
 	if err != nil || string(res) != NOT_FOUND {
 		t.Fatalf("Unexpected returned values of handling: ", err, res)
 	}
@@ -661,7 +666,7 @@ func TestHandlingSuiteDelete2(t *testing.T){
 func TestHandlingSuiteFlushAll(t *testing.T){
 	var storage = cache.New(42)
 	var testEnum = Ascii_protocol_enum{"flush_all", nil, 0, 0, 0, 0, false, nil, ""}
-	res, err := testEnum.HandleRequest(storage)
+	res, err := testEnum.HandleRequest(storage, nil)
 	if err != nil || string(res) != "OK\r\n" {
 		t.Fatalf("Unexpected returned values of handling: ", err, res)
 	}
@@ -669,7 +674,7 @@ func TestHandlingSuiteFlushAll(t *testing.T){
 
 func TestHandlingSuiteVersion(t *testing.T){
 	var testEnum = Ascii_protocol_enum{"version", nil, 0, 0, 0, 0, false, nil, ""}
-	res, err := testEnum.HandleRequest(nil)
+	res, err := testEnum.HandleRequest(nil, nil)
 	if err != nil || string(res) != "VERSION "+ tools.VERSION +"\r\n" {
 		t.Fatalf("Unexpected returned values of handling: ", err, res)
 	}
@@ -677,8 +682,68 @@ func TestHandlingSuiteVersion(t *testing.T){
 
 func TestHandlingSuiteQuit(t *testing.T){
 	var testEnum = Ascii_protocol_enum{"quit", nil, 0, 0, 0, 0, false, nil, ""}
-	res, err := testEnum.HandleRequest(nil)
+	res, err := testEnum.HandleRequest(nil, nil)
 	if err == nil || res != nil {
 		t.Fatalf("Unexpected returned values of handling: ", err, res)
+	}
+}
+
+func TestHandlingStatistic(t *testing.T){
+	var testEnum = Ascii_protocol_enum{"stats", nil, 0, 0, 0, 0, false, nil, ""}
+	var stats = stat.New(42)
+	var storage = cache.New(42)
+
+	res, err := testEnum.HandleRequest(storage, stats)
+	if err != nil || res == nil {
+		t.Fatalf("Unexpected returned values of handling: ", err, res)
+	}
+}
+
+func TestHandlingStatsRecording(t *testing.T){
+	var testEnum = Ascii_protocol_enum{"set", []string{"key", }, 1, 0, 2, 0, true, []byte("42"), ""}
+	var stats = stat.New(42)
+	var storage = cache.New(42)
+	res, err := testEnum.HandleRequest(storage, stats)
+	if err != nil || res == nil {
+		t.Fatalf("Unexpected returned values of handling: ", err, res)
+	}
+	if stats.Commands == nil || stats.Commands["cmd_set"] != 1 {
+		t.Fatalf("Wrong stats handling: ", stats.Commands)
+	}
+
+	stats = stat.New(42)
+	testEnum = Ascii_protocol_enum{"get", []string{"not_key", }, 0, 0, 0, 0, false, nil, ""}
+	res, err = testEnum.HandleRequest(storage, stats)
+	if err != nil || res == nil {
+		t.Fatalf("Unexpected returned values of handling: ", err, res)
+	}
+	if stats.Commands == nil || stats.Commands["cmd_get"] != 1 || stats.Commands["get_misses"] != 1 {
+		t.Fatalf("Wrong stats handling: ", stats.Commands)
+	}
+
+	stats = stat.New(42)
+	testEnum = Ascii_protocol_enum{"get", []string{"key", }, 0, 0, 0, 0, false, nil, ""}
+	res, err = testEnum.HandleRequest(storage, stats)
+	if err != nil || res == nil {
+		t.Fatalf("Unexpected returned values of handling: ", err, res)
+	}
+	if stats.Commands == nil || stats.Commands["cmd_get"] != 1 || stats.Commands["get_hits"] != 1 {
+		t.Fatalf("Wrong stats handling: ", stats.Commands)
+	}
+
+	stats = stat.New(42)
+	testEnum = Ascii_protocol_enum{"cas", []string{"key", }, 1, 0, 42, 424242, false, make([]byte, 42), ""}
+	res, err = testEnum.HandleRequest(storage, stats)
+	if err != nil || res == nil {
+		t.Fatalf("Unexpected returned values of handling: ", err, res)
+	}
+	if stats.Commands == nil || stats.Commands["cas_badval"] != 1 {
+		t.Fatalf("Wrong stats handling: ", stats.Commands)
+	}
+}
+
+func TestHandlingMissing(t *testing.T){
+	if !IsMissed(NOT_FOUND) || !IsMissed(ERROR_TEMP) || !IsMissed("END\r\n") || IsMissed("not_missing") {
+		t.Fatalf("Invalid behavior of function.")
 	}
 }
