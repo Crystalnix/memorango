@@ -49,6 +49,8 @@ func (enum *Ascii_protocol_enum) HandleRequest(storage *cache.LRUCache, stats *s
 		result, err = enum.delete(storage)
 	case "flush_all":
 		result, err = enum.flush_all(storage)
+	case "lru_crawler":
+		return []byte(enum.lru_crawler(storage)), nil
 	case "stats":
 		if stats != nil {
 			return []byte(enum.stat(storage, stats)), nil
@@ -232,6 +234,46 @@ func (enum *Ascii_protocol_enum) stat(storage *cache.LRUCache, stats *stat.Serve
 		result += "STAT " + key + " " + value + "\r\n"
 	}
 	return result + "END\r\n"
+}
+
+//
+func (enum *Ascii_protocol_enum) lru_crawler(storage *cache.LRUCache) string {
+	switch enum.key[0]{
+	case "enable":
+		err := storage.EnableCrawler()
+		if err != nil {
+			return strings.Replace(CLIENT_ERROR_TEMP, "%s", err.Error(), 1)
+		}
+		return "OK\r\n"
+	case "disable":
+		storage.DisableCrawler()
+		return "OK\r\n"
+	case "tocrawl":
+		if len(enum.key) < 2 {
+			return strings.Replace(CLIENT_ERROR_TEMP, "%s", "Wrong parameters number.", 1)
+		}
+		amount, err := tools.StringToInt32(enum.key[1])
+		if amount <= 0 || err != nil {
+			return strings.Replace(CLIENT_ERROR_TEMP, "%s", "Invalid value of passed param.", 1)
+		}
+		storage.Crawler.ItemsPerRun = uint(amount)
+		return "OK\r\n"
+	case "sleep":
+		if len(enum.key) < 2 {
+			return strings.Replace(CLIENT_ERROR_TEMP, "%s", "Wrong parameters number.", 1)
+		}
+		amount, err := tools.StringToInt32(enum.key[1])
+		if err != nil {
+			return strings.Replace(CLIENT_ERROR_TEMP, "%s", "Invalid value of passed param.", 1)
+		}
+		err = storage.Crawler.SetSleep(amount)
+		if err != nil {
+			return strings.Replace(CLIENT_ERROR_TEMP, "%s", err.Error(), 1)
+		}
+		return "OK\r\n"
+	default:
+		return strings.Replace(CLIENT_ERROR_TEMP, "%s", "Command is not implemented.", 1)
+	}
 }
 
 // Utilities

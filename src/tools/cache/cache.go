@@ -43,6 +43,7 @@ type LRUCache struct {
 	items map[string] *LRUCacheItem
 	list *list.List
 	Stats *LRUCacheStat
+	Crawler *LRUCrawler
 }
 
 // Private method of LRUCache for promoting item to the top of list.
@@ -51,19 +52,10 @@ func (c *LRUCache) promote(item *LRUCacheItem) {
 	c.list.MoveToFront(item.listElement)
 }
 
-// Method returns amount of 1MiB slabs stored in cache.
-func (c *LRUCache) slabs_number() int {
-	amount := c.list.Len() / SLAB_SIZE
-	if c.list.Len() % SLAB_SIZE != 0 {
-		 amount ++
-	}
-	return amount
-}
-
 // Private method of LRUCache for releasing of memory.
 // Function receives amount of items to dispose. These items will be discarded from the tail of list.
+// Amount == -1 - flushes all.
 func (c *LRUCache) prune(amount int) {
-	// -1 flushes all
 	var counter = 0
 	for{
 		if amount != -1 && counter == amount { return }
@@ -109,7 +101,6 @@ func (c *LRUCache) Set(Cacheable Cacheable, flags int, expiration_ts int64, cas_
 	if c.capacity < int64(Cacheable.Size()) {
 		c.prune(50)
 	}
-
 	//still not enough room, fail
 	if c.capacity < int64(Cacheable.Size()) {
 		return false
@@ -168,7 +159,6 @@ func (c *LRUCache) SetCas(key string, cas int64) bool {
 }
 
 // Getter for private capacity param
-// TODO: Test for this
 func (c *LRUCache) Capacity() int64 {
 	return c.capacity
 }
@@ -183,6 +173,7 @@ func New(capacity int64 /* bytes */) *LRUCache {
 		items: make(map[string] *LRUCacheItem, 10000),
 		list: list.New(),
 		Stats: &LRUCacheStat{capacity, 0, 0, 0, 0, 0, 0},
+		Crawler: NewCrawler(),
 	}
 }
 
