@@ -5,7 +5,7 @@ import (
 	"time"
 	"os"
 	"tools/cache"
-	"runtime"
+	//"runtime"
 )
 
 func TestNewServerStat(t *testing.T){
@@ -71,12 +71,6 @@ func TestSerializationCase2(t *testing.T){
 	stats.Commands["cas_badval"] ++
 	if len(stats.Serialize(storage)) != 35 {
 		t.Fatalf("Unexpected number of fields of returned value: ", stats)
-	}
-}
-
-func TestNumberOfThreads(t *testing.T){
-	if New(42).threads() != runtime.NumGoroutine() {
-		t.Fatalf("Unexpected number of threads")
 	}
 }
 

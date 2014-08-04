@@ -70,10 +70,18 @@ func (s *ServerStat) bytes(capacity int64) int64 {
 	return int64(s.limit_maxbytes) - capacity
 }
 
-// Function returns number of active goroutines for current process
-func (s *ServerStat) threads() int {
-	return runtime.NumGoroutine()
-}
+//// Function returns number of active threads for current process
+//func (s *ServerStat) threads() string {
+//	cmd := exec.Command("/usr/bin/top", "-pid", tools.IntToString(int64(s.pid)), "-stats", "th")
+//	var out bytes.Buffer
+//	var stderr bytes.Buffer
+//	cmd.Stdout = &out
+//	cmd.Stderr = &stderr
+//	if cmd.Run() != nil {
+//		return "0 : " + stderr.String()
+//	}
+//	return out.String()
+//}
 
 // Function serialize statistic of server and storage and returns it as map of strings
 func (s *ServerStat) Serialize(storage *cache.LRUCache) map[string] string {
@@ -96,7 +104,7 @@ func (s *ServerStat) Serialize(storage *cache.LRUCache) map[string] string {
 	dict["evicted_unfetched"] = tools.IntToString(int64(storage.Stats.Evicted_unfetched))
 	dict["bytes_read"] = tools.IntToString(int64(s.Read_bytes))
 	dict["bytes_written"] = tools.IntToString(int64(s.Written_bytes))
-	dict["threads"] = tools.IntToString(int64(s.threads()))
+	dict["goroutines"] = tools.IntToString(int64(runtime.NumGoroutine()))
 	for key, value := range s.Commands {
 		dict[key] = tools.IntToString(int64(value))
 	}

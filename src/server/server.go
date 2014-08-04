@@ -43,6 +43,7 @@ import (
 	"time"
 	statistic "tools/stat"
 	"sync"
+	"strings"
 )
 
 const (
@@ -54,8 +55,14 @@ const (
 // The private server structure keeps information about server's port, active connections, listened socket,
 // and pointer to LRUCache structure, which consists methods allowed to retrieve and store data.
 type server struct {
-	port string
-	socket net.Listener
+	tcp_port string
+	udp_port string
+	listen_address string
+	cas_disabled bool
+	flush_disabled bool
+	connection_limit int
+	verbosity_lvl int
+	sockets map[string] net.Listener
 	connections map[string] net.Conn
 	storage *cache.LRUCache
 	Stat *statistic.ServerStat
@@ -63,29 +70,47 @@ type server struct {
 }
 
 // Private method of server structure, which starts to listen connection, cache it and delegate it to dispatcher.
-func (server *server) run() {
+func (server *server) run(connection_type string) {
 	server.threadSync.Add(1)
 	defer server.threadSync.Done()
+	var port string
+	if connection_type == "tcp" {
+		port = server.tcp_port
+	} else if connection_type == "udp" {
+		port = server.udp_port
+	} else {
+		//error log.
+		return
+	}
 	rand.Seed(time.Now().Unix())
-	listener, err := net.Listen("tcp", ":" + server.port)
+	listener, err := net.Listen(connection_type, ":" + port)
 	if err != nil {
 		fmt.Println(err)
 		return
 	}
 	//var received_message []byte
-	server.socket = listener
+	server.sockets[connection_type] = listener
 	for {
-		if server.socket == nil {
+		if server.sockets == nil {
 			break
 		}
 		// Accept waits for incoming data and returns the next connection to the listener.
-		fmt.Println("Waiting for connection...")
-		connection, err := server.socket.Accept()
+		connection, err := server.sockets[connection_type].Accept()
 		if err != nil {
-			fmt.Println("Error occured while accepting connection: ", err) // TODO: replace by kind of traceback
+			//TODO: log this
 			continue
 		} else {
 			// handle the connection
+			if len(server.listen_address) > 0 {
+				if strings.Split(connection.RemoteAddr().String(), ":")[0] != server.listen_address {
+					//TODO: log this
+					continue
+				}
+			}
+			if len(server.connections) >= server.connection_limit{
+				//TODO: log this
+				continue
+			}
 			server.connections[connection.RemoteAddr().String()] = connection
 			server.Stat.Current_connections ++
 			server.Stat.Total_connections ++
@@ -103,12 +128,14 @@ func (server *server) stop() {
 			fmt.Println("Can't close connection at", address)
 		}
 	}
-	if server.socket != nil {
-  		err := server.socket.Close()
-		if err != nil {
-			fmt.Println("Error occured during closing socket:", err)
+	if server.sockets != nil {
+		for conn_type, socket := range server.sockets {
+			err := socket.Close()
+			if err != nil {
+				fmt.Println("Error occured during closing " + conn_type + " socket:", err)
+			}
 		}
-		server.socket = nil
+		server.sockets = nil
 	} else {
 		log.Fatal("Server can't be stoped, because socket is undefined.")
 	}
@@ -127,25 +154,27 @@ func (server *server) stop() {
 // The process turns in loop until whether input stream will get an EOF or an error will be occurred.
 // In the last case it will be return some error message to a client.
 // Anyway, at the end connection will be broken up.
-func (server *server) dispatch(address string) {  //TODO: New tests
+func (server *server) dispatch(address string) {
 	server.threadSync.Add(1)
 	defer server.threadSync.Done()
-	fmt.Println("Retrieving connection's data from ", address)
+
+	//fmt.Println("Retrieving connection's data from ", address)
+	//TODO: log this
+
 	connection := server.connections[address]
 	connectionReader := bufio.NewReader(connection)
 	// let's loop the process for open connection, until it will get closed.
 	for {
 		// let's read a header first
 		received_message, n, err := readRequest(connectionReader, -1)
-
-		fmt.Println("Connection stream was read.")
 		if err != nil {
 			if err == io.EOF {
-				fmt.Println("Connection is closed.")
+				//TODO: log this
 				server.breakConnection(connection)
 				break
 			}
 			fmt.Println("Dispatching error: ", err, " Message: ", received_message)
+			//TODO: log this
 			if !server.makeResponse(connection, []byte("ERROR\r\n"), 5){
 				break
 			}
@@ -154,9 +183,19 @@ func (server *server) dispatch(address string) {  //TODO: New tests
 			server.Stat.Read_bytes += uint64(n)
 			parsed_request := protocol.ParseProtocolHeader(string(received_message[ : n - 2]))
 			fmt.Println("Header: ", parsed_request)
+
+			if (parsed_request.Command() == "cas" || parsed_request.Command() == "gets") && server.cas_disabled {
+				//TODO: log this
+				continue
+			} else if parsed_request.Command() == "flush_all" && server.flush_disabled {
+				//TODO: log this
+				continue
+			}
+
 			if parsed_request.DataLen() > 0 {
 				received_message, n, err := readRequest(connectionReader, parsed_request.DataLen())
 				fmt.Println("Data length / read: ", len(received_message), n)
+				//TODO: log this
 				if err != nil {
 					server.breakConnection(connection)
 					break
@@ -193,7 +232,7 @@ func readRequest(reader *bufio.Reader, length int) ([]byte, int, error){
 	for {
 		read, err := reader.ReadByte()
 		if err != nil {
-			fmt.Println("Num: ", counter," read: ", read, " Err: ", err)
+			//fmt.Println("Num: ", counter," read: ", read, " Err: ", err)
 			return buffer, counter, err
 		}
 		buffer = append(buffer, read)
@@ -222,13 +261,13 @@ func readRequest(reader *bufio.Reader, length int) ([]byte, int, error){
 
 // Private method break up the connection, closes it and removes it from cached server's connections.
 func (server *server) breakConnection(connection net.Conn) bool {
-	if server.socket == nil{
+	if server.sockets == nil{
 		return false
 	}
 	delete(server.connections, connection.RemoteAddr().String())
 	err := connection.Close()
 	if err != nil {
-		fmt.Println("Can't break up connection: ", err)
+		//TODO: log this
 		return false
 	}
 	server.Stat.Current_connections --
@@ -240,7 +279,7 @@ func (server *server) breakConnection(connection net.Conn) bool {
 func (server *server) makeResponse(connection net.Conn, response_message []byte, length int) bool {
 	length, err := connection.Write(response_message[0 : length])
 	if err != nil {
-		fmt.Println("Error was occured during making response:", err)
+		//TODO: log this
 		return server.breakConnection(connection)
 	}
 	server.Stat.Written_bytes += uint64(length)
@@ -248,13 +287,26 @@ func (server *server) makeResponse(connection net.Conn, response_message []byte,
 }
 
 // This public function raises up the server.
-// Function receives port string, which uses to open socket at pointed port and int64 value,
-// which uses for limiting of allowed memory to use.
-// Function returns a pointer to server structure with filled and prepared to usage fields.
-func NewServer(port string, bytes_of_memory int64) *server {
+// Function receives following params:
+// tcp_port string, which uses to open tcp socket at pointed port,
+// udp_port string, which uses to open tcp socket at pointed port,
+// address, which specified an only ip address which server will listen to,
+// max_connections, sets a limit of maximal number of active connections,
+// cas, flush - flags which forbid of usage such commands if value = true,
+// verbosity - defines the dept of verbosity for server
+// and bytes_of_memory, which uses for limiting allocated memory.
+// Function returns a pointer to a server structure with filled and prepared to usage fields.
+func NewServer(tcp_port string, udp_port string, address string, max_connections int, cas bool, flush bool,
+	           verbosity int, bytes_of_memory int64) *server {
 	server := new(server)
-	server.socket = nil
-	server.port = port
+	server.sockets = nil
+	server.tcp_port = tcp_port
+	server.udp_port = udp_port
+	server.cas_disabled = cas
+	server.flush_disabled = flush
+	server.connection_limit = max_connections
+	server.listen_address = address
+	server.verbosity_lvl = verbosity
 	server.storage = cache.New(bytes_of_memory)
 	server.connections = make(map[string] net.Conn)
 	server.Stat = statistic.New(bytes_of_memory)
@@ -262,11 +314,15 @@ func NewServer(port string, bytes_of_memory int64) *server {
 }
 
 func (server *server) RunServer() {
-	go server.run()
+	server.sockets = make(map[string] net.Listener)
+	go server.run("tcp")
+	if len(server.udp_port) > 0 {
+		go server.run("udp")
+	}
 }
 
 // Public function receives the pointer to server structure, stops the server and inform about it.
 func (server *server) StopServer() {
 	server.stop()
-	fmt.Println("Server is stopped.")
+	//TODO: log this
 }

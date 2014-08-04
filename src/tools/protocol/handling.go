@@ -319,3 +319,8 @@ func (enum *Ascii_protocol_enum) RecordStats(stats *stat.ServerStat, res string)
 		stats.Commands["cas_badval"] ++
 	}
 }
+
+// Function returns value of command field. //TODO: test
+func (enum *Ascii_protocol_enum) Command() string {
+	return enum.command
+}

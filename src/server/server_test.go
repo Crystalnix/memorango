@@ -15,7 +15,7 @@ var test_address = "127.0.0.1:" + test_port
 func TestServerRunAndStop(t *testing.T){
 //	var test_port = "60000"
 //	var test_address = "127.0.0.1:" + test_port
-	srv := NewServer(test_port, 1024)
+	srv := NewServer(test_port, "", "", 1024, false, false, 0, 1024)
 	srv.RunServer()
 	time.Sleep(time.Millisecond * time.Duration(10)) // Let's wait a bit while goroutines will start
 	connection, err := net.Dial("tcp", test_address)
@@ -48,7 +48,7 @@ func TestServerRunAndStop(t *testing.T){
 func TestServerConsistenceAndConnections(t *testing.T){
 //	var test_port = "60001"
 //	var test_address = "127.0.0.1:" + test_port
-	srv := NewServer(test_port, 1024)
+	srv := NewServer(test_port, "", "", 1024, false, false, 0, 1024)
 	srv.RunServer()
 	time.Sleep(time.Millisecond * time.Duration(10))
 	defer srv.StopServer()
@@ -57,8 +57,8 @@ func TestServerConsistenceAndConnections(t *testing.T){
 	if err != nil {
 		t.Fatalf("Server wasn't run: %s", err)
 	}
-	if srv.port != test_port || srv.socket == nil || srv.storage == nil {
-		t.Fatalf("Unexpected consistence: %s, %s, %s", srv.port, srv.socket, srv.storage)
+	if srv.tcp_port != test_port || srv.sockets == nil || srv.storage == nil {
+		t.Fatalf("Unexpected consistence: %s, %s, %s", srv.tcp_port, srv.sockets, srv.storage)
 	}
 	var test_msg = []byte("Test1\r\n")
 	_, err = connection.Write(test_msg)
@@ -79,7 +79,7 @@ func TestServerConsistenceAndConnections(t *testing.T){
 func TestServerResponseAndConnections(t *testing.T){
 //	var test_port = "60002"
 //	var test_address = "127.0.0.1:" + test_port
-	srv := NewServer(test_port, 1024)
+	srv := NewServer(test_port, "", "", 1024, false, false, 0, 1024)
 	srv.RunServer()
 	time.Sleep(time.Millisecond * time.Duration(10))
 	defer srv.StopServer()
