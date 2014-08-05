@@ -4,7 +4,6 @@ import (
 	"time"
 	"errors"
 	"sync"
-	"fmt"
 )
 
 const (
@@ -66,12 +65,10 @@ func (c *LRUCache) crawl(w_group *sync.WaitGroup) {
 	defer c.DisableCrawler()
 	current_list_elem := c.list.Back()
 	if current_list_elem == nil || c.Crawler.ItemsPerRun == 0 {
-		fmt.Println("items or current list are undefined")
 		return
 	}
 	w_group.Done()
 	w_group.Add(1) // to make counter positive
-	fmt.Println("Start loop.")
 	for {
 		if !c.Crawler.enabled || c.Crawler.ItemsPerRun  == 0 {
 			c.DisableCrawler()

@@ -6,7 +6,6 @@ import (
 	"tools"
 	"strings"
 	"errors"
-	"fmt"
 )
 
 // Public method of Ascii_protocol_enum operates with received storage: retrieves, discards, sets or updates items,
@@ -16,7 +15,6 @@ import (
 // Returns response to client as byte-string and error/nil.
 // If process was successful, there will be returned nil instead of error, otherwise it will be returned specified error.
 func (enum *Ascii_protocol_enum) HandleRequest(storage *cache.LRUCache, stats *stat.ServerStat) ([]byte, error) {
-	fmt.Println("Start handle request: ", enum)
 	var err error
 	if len(enum.error) > 0 {
 		return []byte(enum.error), nil

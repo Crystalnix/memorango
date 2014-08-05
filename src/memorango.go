@@ -72,8 +72,8 @@ func main() {
 		fmt.Println("Status: ",
 					exec.Command("/usr/bin/nohup", transacted_options...).Start())
 	} else {
-		fmt.Printf("%d Run MemoranGo on 127.0.0.1:%s with %d MiB allocated memory.\n",
-			os.Getpid(), *tcp_port, *memory_amount_mb)
+		fmt.Printf("%d Run MemoranGo on 127.0.0.1:%s with %d MiB allocated memory.\n Verbosity %d, UDPPort %s, Limit of connections %d, cas %b, flush %b, listening address <%s>.\n",
+			os.Getpid(), *tcp_port, *memory_amount_mb, verbosity, *udp_port, *max_connections, !*disable_cas, !*disable_flush, *listen_ip)
 		_server := server.NewServer(*tcp_port, *udp_port, *listen_ip, *max_connections, *disable_cas, *disable_flush,
 									verbosity, int64(*memory_amount_mb)*1024*1024 /* let's convert to bytes */)
 		_server.RunServer()

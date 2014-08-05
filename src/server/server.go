@@ -31,12 +31,13 @@ tools/stat - contains struct for keeping information about server, its actions a
 package server
 
 import (
-	"fmt"
+	//"fmt"
 	"net"
 	"log"
 	"tools/cache"
 	"tools/protocol"
 	"io"
+	"os"
 	"bufio"
 	"errors"
 	"math/rand"
@@ -44,6 +45,7 @@ import (
 	statistic "tools/stat"
 	"sync"
 	"strings"
+	"io/ioutil"
 )
 
 const (
@@ -51,6 +53,47 @@ const (
 	MAX_KEY_LENGTH = 250
 )
 
+// Structure for managing of output information during work of server.
+type ServerLogger struct {
+	info    *log.Logger
+	warning *log.Logger
+	error   *log.Logger
+}
+
+// Initialization of information management system for server by verbosity level:
+// 0 - only errors,
+// 1 - errors and warnings,
+// 2 - errors, warnings and info.
+func NewServerLogger(verbosity int) *ServerLogger {
+	var result ServerLogger
+	result.error = log.New(os.Stderr, "Error: ", log.Ldate | log.Ltime | log.Lshortfile)
+	if verbosity >= 1 {
+		result.warning = log.New(os.Stdout, "Warning: ", log.Ldate | log.Ltime | log.Lshortfile)
+	} else {
+		result.warning = log.New(ioutil.Discard, "", 0)
+	}
+	if verbosity == 2 {
+		result.info = log.New(os.Stdout, "Info: ", log.Ldate | log.Ltime | log.Lshortfile)
+	} else {
+		result.info = log.New(ioutil.Discard, "", 0)
+	}
+	return &result
+}
+
+// Display info-level
+func (l *ServerLogger) Info(args ...interface{}){
+	l.info.Println(args)
+}
+
+// Display error-level
+func (l *ServerLogger) Error(args ...interface{}){
+	l.error.Println(args)
+}
+
+// Display warning-level
+func (l *ServerLogger) Warning(args ...interface{}){
+	l.warning.Println(args)
+}
 
 // The private server structure keeps information about server's port, active connections, listened socket,
 // and pointer to LRUCache structure, which consists methods allowed to retrieve and store data.
@@ -61,12 +104,12 @@ type server struct {
 	cas_disabled bool
 	flush_disabled bool
 	connection_limit int
-	verbosity_lvl int
 	sockets map[string] net.Listener
 	connections map[string] net.Conn
 	storage *cache.LRUCache
 	Stat *statistic.ServerStat
 	threadSync sync.WaitGroup
+	Logger *ServerLogger
 }
 
 // Private method of server structure, which starts to listen connection, cache it and delegate it to dispatcher.
@@ -79,13 +122,13 @@ func (server *server) run(connection_type string) {
 	} else if connection_type == "udp" {
 		port = server.udp_port
 	} else {
-		//error log.
+		server.Logger.Error("There is no such type of connection:", connection_type)
 		return
 	}
 	rand.Seed(time.Now().Unix())
 	listener, err := net.Listen(connection_type, ":" + port)
 	if err != nil {
-		fmt.Println(err)
+		server.Logger.Error("Couldn't establish listener:", err)
 		return
 	}
 	//var received_message []byte
@@ -97,18 +140,18 @@ func (server *server) run(connection_type string) {
 		// Accept waits for incoming data and returns the next connection to the listener.
 		connection, err := server.sockets[connection_type].Accept()
 		if err != nil {
-			//TODO: log this
+			server.Logger.Warning("Connection couldn't be accepted:", err)
 			continue
 		} else {
 			// handle the connection
 			if len(server.listen_address) > 0 {
 				if strings.Split(connection.RemoteAddr().String(), ":")[0] != server.listen_address {
-					//TODO: log this
+					server.Logger.Warning("Connection address", connection.RemoteAddr().String(), "doesn't match with", server.listen_address)
 					continue
 				}
 			}
 			if len(server.connections) >= server.connection_limit{
-				//TODO: log this
+				server.Logger.Error("Impossible connect to the server. There are too much active connections right now.")
 				continue
 			}
 			server.connections[connection.RemoteAddr().String()] = connection
@@ -123,23 +166,23 @@ func (server *server) run(connection_type string) {
 func (server *server) stop() {
 	for address, connection := range server.connections {
 		if server.breakConnection(connection) {
-			fmt.Println("Closed connection at", address)
+			server.Logger.Info("Close connection at", address)
 		} else {
-			fmt.Println("Can't close connection at", address)
+			server.Logger.Warning("Impossible to close connection at", address)
 		}
 	}
 	if server.sockets != nil {
 		for conn_type, socket := range server.sockets {
 			err := socket.Close()
 			if err != nil {
-				fmt.Println("Error occured during closing " + conn_type + " socket:", err)
+				server.Logger.Error("Error occured during closing " + conn_type + " socket:", err)
 			}
 		}
 		server.sockets = nil
 	} else {
-		log.Fatal("Server can't be stoped, because socket is undefined.")
+		server.Logger.Error("Server can't be stoped, because socket is undefined.")
 	}
-	fmt.Println("Waiting for goroutines...")
+	server.Logger.Info("Waiting for ending process of goroutines...")
 	server.threadSync.Wait() // Waiting for all goroutines while done their jobs.
 	server.storage.FlushAll()
 	server.storage = nil
@@ -157,10 +200,6 @@ func (server *server) stop() {
 func (server *server) dispatch(address string) {
 	server.threadSync.Add(1)
 	defer server.threadSync.Done()
-
-	//fmt.Println("Retrieving connection's data from ", address)
-	//TODO: log this
-
 	connection := server.connections[address]
 	connectionReader := bufio.NewReader(connection)
 	// let's loop the process for open connection, until it will get closed.
@@ -169,12 +208,11 @@ func (server *server) dispatch(address string) {
 		received_message, n, err := readRequest(connectionReader, -1)
 		if err != nil {
 			if err == io.EOF {
-				//TODO: log this
+				server.Logger.Info("Input stream has got EOF, and now is being closed.")
 				server.breakConnection(connection)
 				break
 			}
-			fmt.Println("Dispatching error: ", err, " Message: ", received_message)
-			//TODO: log this
+			server.Logger.Warning("Dispatching error: ", err, " Message: ", received_message)
 			if !server.makeResponse(connection, []byte("ERROR\r\n"), 5){
 				break
 			}
@@ -182,33 +220,34 @@ func (server *server) dispatch(address string) {
 			// Here the message should be handled
 			server.Stat.Read_bytes += uint64(n)
 			parsed_request := protocol.ParseProtocolHeader(string(received_message[ : n - 2]))
-			fmt.Println("Header: ", parsed_request)
+			server.Logger.Info("Header: ", *parsed_request)
 
 			if (parsed_request.Command() == "cas" || parsed_request.Command() == "gets") && server.cas_disabled {
-				//TODO: log this
+				server.Logger.Warning("Cas command is forbidden.")
 				continue
 			} else if parsed_request.Command() == "flush_all" && server.flush_disabled {
-				//TODO: log this
+				server.Logger.Warning("Flush all command is forbidden.")
 				continue
 			}
 
 			if parsed_request.DataLen() > 0 {
-				received_message, n, err := readRequest(connectionReader, parsed_request.DataLen())
-				fmt.Println("Data length / read: ", len(received_message), n)
-				//TODO: log this
+				received_message, _, err := readRequest(connectionReader, parsed_request.DataLen())
 				if err != nil {
+					server.Logger.Error("Error occurred while reading data:", err)
 					server.breakConnection(connection)
 					break
 				}
 				parsed_request.SetData(received_message[0 : ])
 			}
+			server.Logger.Info("Start handling request:", *parsed_request)
 			response_message, err := parsed_request.HandleRequest(server.storage, server.Stat)
-			fmt.Println("Server is sending response:\n", string(response_message[0 : len(response_message)]))
+			server.Logger.Info("Server is sending response:\n", string(response_message[0 : len(response_message)]))
 			// if there is no flag "noreply" in the header:
 			if parsed_request.Reply() {
 				server.makeResponse(connection, response_message, len(response_message))
 			}
 			if err != nil {
+				server.Logger.Error("Impossible to send request:", err)
 				server.breakConnection(connection)
 				break
 			}
@@ -267,7 +306,7 @@ func (server *server) breakConnection(connection net.Conn) bool {
 	delete(server.connections, connection.RemoteAddr().String())
 	err := connection.Close()
 	if err != nil {
-		//TODO: log this
+		server.Logger.Warning("Impossible to break connection:", err)
 		return false
 	}
 	server.Stat.Current_connections --
@@ -279,7 +318,7 @@ func (server *server) breakConnection(connection net.Conn) bool {
 func (server *server) makeResponse(connection net.Conn, response_message []byte, length int) bool {
 	length, err := connection.Write(response_message[0 : length])
 	if err != nil {
-		//TODO: log this
+		server.Logger.Warning("Error occurred during writing data to output stream:", err)
 		return server.breakConnection(connection)
 	}
 	server.Stat.Written_bytes += uint64(length)
@@ -306,10 +345,10 @@ func NewServer(tcp_port string, udp_port string, address string, max_connections
 	server.flush_disabled = flush
 	server.connection_limit = max_connections
 	server.listen_address = address
-	server.verbosity_lvl = verbosity
 	server.storage = cache.New(bytes_of_memory)
 	server.connections = make(map[string] net.Conn)
 	server.Stat = statistic.New(bytes_of_memory)
+	server.Logger = NewServerLogger(verbosity)
 	return server
 }
 
@@ -324,5 +363,5 @@ func (server *server) RunServer() {
 // Public function receives the pointer to server structure, stops the server and inform about it.
 func (server *server) StopServer() {
 	server.stop()
-	//TODO: log this
+	server.Logger.Info("Server is now stopped.")
 }
