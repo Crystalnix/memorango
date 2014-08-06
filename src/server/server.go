@@ -31,7 +31,6 @@ tools/stat - contains struct for keeping information about server, its actions a
 package server
 
 import (
-	//"fmt"
 	"net"
 	"log"
 	"tools/cache"
@@ -46,6 +45,7 @@ import (
 	"sync"
 	"strings"
 	"io/ioutil"
+	"tools/stat"
 )
 
 const (
@@ -154,8 +154,12 @@ func (server *server) run(connection_type string) {
 				server.Logger.Error("Impossible connect to the server. There are too much active connections right now.")
 				continue
 			}
-			server.connections[connection.RemoteAddr().String()] = connection
-			server.Stat.Current_connections ++
+			addr := connection.RemoteAddr().String()
+			if server.connections[addr] == nil {
+				server.connections[addr] = connection
+				server.Stat.Connections[addr] = stat.NewConnStat(addr)
+				server.Stat.Current_connections ++
+			}
 			server.Stat.Total_connections ++
 			go server.dispatch(connection.RemoteAddr().String())
 		}
@@ -300,6 +304,10 @@ func readRequest(reader *bufio.Reader, length int) ([]byte, int, error){
 
 // Private method break up the connection, closes it and removes it from cached server's connections.
 func (server *server) breakConnection(connection net.Conn) bool {
+	address := connection.RemoteAddr().String()
+	server.Stat.Connections[address].State = "conn_closing"
+	defer delete(server.Stat.Connections, address)
+
 	if server.sockets == nil{
 		return false
 	}
@@ -347,7 +355,7 @@ func NewServer(tcp_port string, udp_port string, address string, max_connections
 	server.listen_address = address
 	server.storage = cache.New(bytes_of_memory)
 	server.connections = make(map[string] net.Conn)
-	server.Stat = statistic.New(bytes_of_memory)
+	server.Stat = statistic.New(bytes_of_memory, tcp_port, udp_port, max_connections, verbosity, cas, flush)
 	server.Logger = NewServerLogger(verbosity)
 	return server
 }

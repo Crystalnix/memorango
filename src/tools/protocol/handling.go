@@ -225,11 +225,25 @@ func (enum *Ascii_protocol_enum) fold(storage *cache.LRUCache, sign int) (string
 }
 
 // Implements fetching of statistic without arguments.
-// TODO: to include arguments support through enum.key[...]
 func (enum *Ascii_protocol_enum) stat(storage *cache.LRUCache, stats *stat.ServerStat) string {
 	var result = ""
-	for key, value := range stats.Serialize(storage){
-		result += "STAT " + key + " " + value + "\r\n"
+	if len(enum.key) == 0 {
+		for key, value := range stats.Serialize(storage) {
+			result += "STAT " + key + " " + value + "\r\n"
+		}
+	} else {
+		switch enum.key[0] {
+		case "settings":
+			for key, value := range stats.Settings(storage) {
+				result += "STAT " + key + " " + value + "\r\n"
+			}
+		case "items":
+			/* ... */
+		case "conns":
+		default:
+			return strings.Replace(CLIENT_ERROR_TEMP, "%s", "Command is not implemented.", 1)
+
+		}
 	}
 	return result + "END\r\n"
 }
@@ -294,7 +308,6 @@ func (enum *Ascii_protocol_enum) SetData(data []byte) bool {
 	}
 	return false
 }
-
 
 // Function checks was the passed param res successful whether not.
 func IsMissed(res string) bool {

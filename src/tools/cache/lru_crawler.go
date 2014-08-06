@@ -41,6 +41,9 @@ func (c *LRUCrawler) SetSleep(duration int) error {
 
 // Function turns on crawler and runs main loop within thread.
 func (c *LRUCache) EnableCrawler() error {
+	if c.Crawler.enabled {
+		return errors.New("Crawler is already in use.")
+	}
 	c.Crawler.enabled = true
 	var crawl_sync sync.WaitGroup
 	crawl_sync.Add(1)
@@ -50,6 +53,16 @@ func (c *LRUCache) EnableCrawler() error {
 		return errors.New("Failed to start crawler.")
 	}
 	return nil
+}
+
+// Getter for enabled field.
+func (c *LRUCrawler) Enabled() bool {
+	return c.enabled
+}
+
+// Getter for sleep_period field.
+func (c *LRUCrawler) Sleep() int {
+	return int(c.sleep_period)
 }
 
 // Function disables crawler by turning off its main loop.
