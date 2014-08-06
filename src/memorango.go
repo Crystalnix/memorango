@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"flag"
-	"sync"
+	//"sync"
 	"server"
 	"tools"
 	"os"
@@ -27,12 +27,15 @@ func main() {
 	deep_verbose := flag.Bool("vv", false, "Turning deep verbosity on. This option includes requests, responses and same output as simple verbosity.")
 	flag.Parse()
 
-	if *memory_amount_mb <= 0 {
-		fmt.Println("Impossible to run server with incorrect specified amount of available data.")
+	if *help {
+		// TODO: It should be spread in future.
+		fmt.Println("MemoranGo - memory caching service.\nusage:\nmemorango -m <memory_to_alloc> [-CvhFvvd]\n"+
+				"\t[-l <listen_ip>] [-c <limit_connections>] [-p <tcp_port>] [-U <udp_port>]")
 		return
 	}
-	if *help {
-		//TODO: show info
+
+	if *memory_amount_mb <= 0 {
+		fmt.Println("Impossible to run server with incorrect specified amount of available data.")
 		return
 	}
 
@@ -68,18 +71,22 @@ func main() {
 			transacted_options = append(transacted_options, "-vv")
 		}
 		transacted_options = append(transacted_options, "&")
-		fmt.Printf("Run MemoranGo daemon at 127.0.0.1:%s with %d MiB allocated memory.\n", *tcp_port, *memory_amount_mb)
-		fmt.Println("Status: ",
-					exec.Command("/usr/bin/nohup", transacted_options...).Start())
+		fmt.Printf("Run MemoranGo daemon at 127.0.0.1:%s with %d MiB allowed memory.\n", *tcp_port, *memory_amount_mb)
+		cmd := exec.Command("/usr/bin/nohup", transacted_options...)
+		start_err := cmd.Start()
+		if start_err != nil {
+			fmt.Println("Status: ", start_err)
+		}
 	} else {
-		fmt.Printf("%d Run MemoranGo on 127.0.0.1:%s with %d MiB allocated memory.\n Verbosity %d, UDPPort %s, Limit of connections %d, cas %b, flush %b, listening address <%s>.\n",
+		fmt.Printf("%d Run MemoranGo on 127.0.0.1:%s with %d MiB allowed memory.\n Verbosity %d, UDPPort %s, Limit of connections %d, cas %b, flush %b, listening address <%s>.\n",
 			os.Getpid(), *tcp_port, *memory_amount_mb, verbosity, *udp_port, *max_connections, !*disable_cas, !*disable_flush, *listen_ip)
 		_server := server.NewServer(*tcp_port, *udp_port, *listen_ip, *max_connections, *disable_cas, *disable_flush,
 									verbosity, int64(*memory_amount_mb)*1024*1024 /* let's convert to bytes */)
 		_server.RunServer()
 		defer _server.StopServer()
-		var w sync.WaitGroup
-		w.Add(1)
-		w.Wait()
+//		var w sync.WaitGroup
+//		w.Add(1)
+//		w.Wait()
+		_server.ThreadSync.Wait()
 	}
 }

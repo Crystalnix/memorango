@@ -53,6 +53,7 @@ const (
 	MAX_KEY_LENGTH = 250
 )
 
+//TODO: Tests for logger
 // Structure for managing of output information during work of server.
 type ServerLogger struct {
 	info    *log.Logger
@@ -108,14 +109,13 @@ type server struct {
 	connections map[string] net.Conn
 	storage *cache.LRUCache
 	Stat *statistic.ServerStat
-	threadSync sync.WaitGroup
+	ThreadSync sync.WaitGroup
 	Logger *ServerLogger
 }
 
 // Private method of server structure, which starts to listen connection, cache it and delegate it to dispatcher.
 func (server *server) run(connection_type string) {
-	server.threadSync.Add(1)
-	defer server.threadSync.Done()
+	defer server.ThreadSync.Done()
 	var port string
 	if connection_type == "tcp" {
 		port = server.tcp_port
@@ -183,7 +183,7 @@ func (server *server) stop() {
 		server.Logger.Error("Server can't be stoped, because socket is undefined.")
 	}
 	server.Logger.Info("Waiting for ending process of goroutines...")
-	server.threadSync.Wait() // Waiting for all goroutines while done their jobs.
+	server.ThreadSync.Wait() // Waiting for all goroutines while done their jobs.
 	server.storage.FlushAll()
 	server.storage = nil
 	server.connections = nil
@@ -198,8 +198,8 @@ func (server *server) stop() {
 // In the last case it will be return some error message to a client.
 // Anyway, at the end connection will be broken up.
 func (server *server) dispatch(address string) {
-	server.threadSync.Add(1)
-	defer server.threadSync.Done()
+	server.ThreadSync.Add(1)
+	defer server.ThreadSync.Done()
 	connection := server.connections[address]
 	connectionReader := bufio.NewReader(connection)
 	// let's loop the process for open connection, until it will get closed.
@@ -247,7 +247,7 @@ func (server *server) dispatch(address string) {
 				server.makeResponse(connection, response_message, len(response_message))
 			}
 			if err != nil {
-				server.Logger.Error("Impossible to send request:", err)
+				server.Logger.Error("Impossible to send response:", err)
 				server.breakConnection(connection)
 				break
 			}
@@ -354,8 +354,10 @@ func NewServer(tcp_port string, udp_port string, address string, max_connections
 
 func (server *server) RunServer() {
 	server.sockets = make(map[string] net.Listener)
+	server.ThreadSync.Add(1)
 	go server.run("tcp")
 	if len(server.udp_port) > 0 {
+		server.ThreadSync.Add(1)
 		go server.run("udp")
 	}
 }

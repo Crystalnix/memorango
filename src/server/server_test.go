@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"time"
 	"bytes"
+	"os"
 	"bufio"
 )
 
@@ -151,5 +152,36 @@ func TestServerReader2(t *testing.T){
 	res, n, err = readRequest(reader, 298)
 	if err != nil {
 		t.Fatalf("Unexpected behaviour: ", err, res, n)
+	}
+}
+
+//TODO: out of order yet.
+func TestServerLogger(t *testing.T){
+	var buf = make([]byte, 20)
+	logger := NewServerLogger(0)
+	logger.Error("errortest")
+	logger.Warning("warningtest")
+	logger.Info("infotest")
+	n, _ := os.Stdout.Read(buf)
+	if n != 0 {
+		t.Fatalf("Unexpected logger behavior", string(buf), n)
+	}
+	n, _ = os.Stderr.Read(buf)
+	if n == 0 || string(buf) != "errortest" {
+		t.Fatalf("Unexpected logger behavior", string(buf), n)
+	}
+
+	logger = NewServerLogger(1)
+	logger.Error("errortest")
+	logger.Warning("warningtest")
+	logger.Info("infotest")
+
+	n, _ = os.Stdout.Read(buf)
+	if n == 0 || string(buf) != "warningtest" {
+		t.Fatalf("Unexpected logger behavior", string(buf), n)
+	}
+	n, _ = os.Stderr.Read(buf)
+	if n == 0 || string(buf) != "errortest" {
+		t.Fatalf("Unexpected logger behavior", string(buf), n)
 	}
 }

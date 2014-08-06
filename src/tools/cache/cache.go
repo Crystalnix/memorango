@@ -107,10 +107,12 @@ func (c *LRUCache) Set(Cacheable Cacheable, flags int, expiration_ts int64, cas_
 	}
 	item, exists := c.items[Cacheable.Key()]
 	if exists {
+		old_size := item.Cacheable.Size()
 		item.Cacheable = Cacheable
 		item.Cas_unique = cas_unique
 		item.Flags = flags
 		item.Exptime = expiration_ts
+		c.capacity -= int64(Cacheable.Size() - old_size)
 		c.promote(item)
 	} else {
 		item = &LRUCacheItem{
