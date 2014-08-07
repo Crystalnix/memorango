@@ -104,7 +104,7 @@ func (l *ServerLogger) Warning(args ...interface{}){
 
 // The private server structure keeps information about server's port, active connections, listened socket,
 // and pointer to LRUCache structure, which consists methods allowed to retrieve and store data.
-type server struct {
+type Server struct {
 	tcp_port string
 	udp_port string
 	listen_address string
@@ -120,7 +120,7 @@ type server struct {
 }
 
 // Private method of server structure, which starts to listen connection, cache it and delegate it to dispatcher.
-func (server *server) run(connection_type string) {
+func (server *Server) run(connection_type string) {
 	defer server.ThreadSync.Done()
 	var port string
 	if connection_type == "tcp" {
@@ -175,7 +175,7 @@ func (server *server) run(connection_type string) {
 }
 
 // Private method of server struct, which closes socket listener and stops serving.
-func (server *server) stop() {
+func (server *Server) stop() {
 	for address, connection := range server.connections {
 		if server.breakConnection(connection) {
 			server.Logger.Info("Close connection at", address)
@@ -209,7 +209,7 @@ func (server *server) stop() {
 // The process turns in loop until whether input stream will get an EOF or an error will be occurred.
 // In the last case it will be return some error message to a client.
 // Anyway, at the end connection will be broken up.
-func (server *server) dispatch(address string) {
+func (server *Server) dispatch(address string) {
 	server.Stat.Connections[address].State = "conn_new_cmd"
 	server.ThreadSync.Add(1)
 	defer server.ThreadSync.Done()
@@ -318,7 +318,7 @@ func readRequest(reader *bufio.Reader, length int) ([]byte, int, error){
 
 
 // Private method break up the connection, closes it and removes it from cached server's connections.
-func (server *server) breakConnection(connection net.Conn) bool {
+func (server *Server) breakConnection(connection net.Conn) bool {
 	address := connection.RemoteAddr().String()
 	server.Stat.Connections[address].State = "conn_closing"
 	defer delete(server.Stat.Connections, address)
@@ -338,7 +338,7 @@ func (server *server) breakConnection(connection net.Conn) bool {
 
 // Private method writes a byte-string to connection output stream.
 // Function receives connection, message and length of this message.
-func (server *server) makeResponse(connection net.Conn, response_message []byte, length int) bool {
+func (server *Server) makeResponse(connection net.Conn, response_message []byte, length int) bool {
 	length, err := connection.Write(response_message[0 : length])
 	if err != nil {
 		server.Logger.Warning("Error occurred during writing data to output stream:", err)
@@ -359,8 +359,8 @@ func (server *server) makeResponse(connection net.Conn, response_message []byte,
 // and bytes_of_memory, which uses for limiting allocated memory.
 // Function returns a pointer to a server structure with filled and prepared to usage fields.
 func NewServer(tcp_port string, udp_port string, address string, max_connections int, cas bool, flush bool,
-	           verbosity int, bytes_of_memory int64) *server {
-	server := new(server)
+	           verbosity int, bytes_of_memory int64) *Server {
+	server := new(Server)
 	server.sockets = nil
 	server.tcp_port = tcp_port
 	server.udp_port = udp_port
@@ -376,7 +376,7 @@ func NewServer(tcp_port string, udp_port string, address string, max_connections
 }
 
 // Public function runs loops with all available protocols
-func (server *server) RunServer() {
+func (server *Server) RunServer() {
 	server.sockets = make(map[string] net.Listener)
 	server.ThreadSync.Add(1)
 	go server.run("tcp")
@@ -387,7 +387,7 @@ func (server *server) RunServer() {
 }
 
 // Public function receives the pointer to server structure, stops the server and inform about it.
-func (server *server) StopServer() {
+func (server *Server) StopServer() {
 	server.stop()
 	server.Logger.Info("Server is now stopped.")
 }
