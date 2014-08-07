@@ -23,6 +23,7 @@ type LRUCacheItem struct {
 	Cas_unique int64
 	listElement *list.Element
 	touched bool
+	ts int64
 }
 
 // Structure for storage statistics.
@@ -34,6 +35,7 @@ type LRUCacheStat struct {
 	Current_items int
 	Total_items int64
 	Crawler_reclaimed int64
+	Outofmem int64
 }
 
 // Implementation of LRUCache itself.
@@ -99,6 +101,7 @@ func (c *LRUCache) Get(key string) *LRUCacheItem {
 // Function returns true if item was stored or false if there was no space for it.
 func (c *LRUCache) Set(Cacheable Cacheable, flags int, expiration_ts int64, cas_unique int64) bool {
 	if c.capacity < int64(Cacheable.Size()) {
+		c.Stats.Outofmem ++
 		c.prune(50)
 	}
 	//still not enough room, fail
@@ -121,6 +124,7 @@ func (c *LRUCache) Set(Cacheable Cacheable, flags int, expiration_ts int64, cas_
 			Exptime: expiration_ts,
 			Cas_unique: cas_unique,
 			touched: false,
+			ts: time.Now().Unix(),
 		}
 		item.listElement = c.list.PushFront(item)
 		c.items[Cacheable.Key()] = item
@@ -174,7 +178,7 @@ func New(capacity int64 /* bytes */) *LRUCache {
 		capacity: capacity,
 		items: make(map[string] *LRUCacheItem, 10000),
 		list: list.New(),
-		Stats: &LRUCacheStat{capacity, 0, 0, 0, 0, 0, 0},
+		Stats: &LRUCacheStat{capacity, 0, 0, 0, 0, 0, 0, 0},
 		Crawler: NewCrawler(),
 	}
 }
@@ -196,4 +200,13 @@ func (c *LRUCache) deleteExpired(Cacheable Cacheable) bool {
 		}
 	}
 	return false
+}
+
+//TODO: Tests for functionality below.
+// Function returns a timestamp of oldest stored item.
+func (s *LRUCache) Oldest() int64 {
+	if s.list.Back() == nil {
+		return time.Now().Unix()
+	}
+	return s.list.Back().Value.(*LRUCacheItem).ts
 }

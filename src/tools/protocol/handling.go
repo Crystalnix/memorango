@@ -238,11 +238,13 @@ func (enum *Ascii_protocol_enum) stat(storage *cache.LRUCache, stats *stat.Serve
 				result += "STAT " + key + " " + value + "\r\n"
 			}
 		case "items":
-			/* ... */
+			for key, value := range stats.Items(storage) {
+				result += "STAT <NULL>:" + key + " " + value + "\r\n"
+			}
 		case "conns":
-		default:
-			return strings.Replace(CLIENT_ERROR_TEMP, "%s", "Command is not implemented.", 1)
-
+			for _, value := range stats.Conns() {
+				result += "STAT " + value + "\r\n"
+			}
 		}
 	}
 	return result + "END\r\n"

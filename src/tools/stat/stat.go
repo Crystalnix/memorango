@@ -7,6 +7,7 @@ import (
 	"runtime"
 	"tools/cache"
 	"tools"
+	"net"
 )
 
 const (
@@ -24,7 +25,7 @@ type ServerStat struct {
 	udp string
 	cas_disabled bool
 	flush_disabled bool
-	Connections map[string] ConnectionStat
+	Connections map[string] *ConnectionStat
 	Current_connections uint32
 	Total_connections uint32
 	Connections_limit int
@@ -60,12 +61,12 @@ func New(memory_amount int64, tcp_port string, udp_port string,
 		pid: os.Getpid(),
 		init_ts: time.Now().Unix(),
 		limit_maxbytes: memory_amount,
-		connections: make(map[string] ConnectionStat),
 		tcp: tcp_port,
 		udp: udp_port,
 		verbosity: verbosity,
 		cas_disabled: cas_disabled,
 		flush_disabled: flush_disabled,
+		Connections: make(map[string] *ConnectionStat),
 		Connections_limit: conn_max,
 		Current_connections: 0,
 		Total_connections: 0,
@@ -127,6 +128,7 @@ func (s *ServerStat) Serialize(storage *cache.LRUCache) map[string] string {
 	dict["bytes_read"] = tools.IntToString(int64(s.Read_bytes))
 	dict["bytes_written"] = tools.IntToString(int64(s.Written_bytes))
 	dict["goroutines"] = tools.IntToString(int64(runtime.NumGoroutine()))
+	dict["crawler_reclaimed"] = tools.IntToString(storage.Stats.Crawler_reclaimed)
 	for key, value := range s.Commands {
 		dict[key] = tools.IntToString(int64(value))
 	}
@@ -163,17 +165,34 @@ func (s *ServerStat) Settings(storage *cache.LRUCache) map[string] string {
 	return dict
 }
 
+//TODO: test for functionality below
 // Function serialize sub command of stats "conns"
-func (s *ServerStat) Conns() map[string] string {
-	dict := make(map[string] string)
-	return dict
+func (s *ServerStat) Conns() []string {
+	var arr []string
+	for _, value := range s.Connections {
+		arr = append(arr, "<NULL>:addr " + value.Addr,  "<NULL>:state " + value.State,
+				     "<NULL>:secs_since_last_cmd " + tools.IntToString(time.Now().Unix() - value.Cmd_hit_ts))
+	}
+	return arr
 }
 
 // Constructor for connection statistic
-func NewConnStat(connection_addr string) *ConnectionStat {
+func NewConnStat(connection net.Conn) *ConnectionStat {
 	return &ConnectionStat {
 		State: "conn_waiting",
-		Sec_since_last_cmd: 0,
-		Addr: connection_addr,
+		Cmd_hit_ts: time.Now().Unix(),
+		Addr: connection.RemoteAddr().Network() + "[" + connection.RemoteAddr().String() + "]",
 	}
+}
+
+// Serialization of sub command items
+func (s *ServerStat) Items(storage *cache.LRUCache) map[string] string {
+	dict := make(map[string] string)
+	dict["number"] = tools.IntToString(int64(storage.Stats.Current_items))
+	dict["age"] = tools.IntToString(time.Now().Unix() - storage.Oldest())
+	dict["expired_unfetched"] = tools.IntToString(int64(storage.Stats.Expired_unfetched))
+	dict["evicted_unfetched"] = tools.IntToString(int64(storage.Stats.Evicted_unfetched))
+	dict["crawler_reclaimed"] = tools.IntToString(storage.Stats.Crawler_reclaimed)
+	dict["outofmemory"] = tools.IntToString(storage.Stats.Outofmem)
+	return dict
 }

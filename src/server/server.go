@@ -33,6 +33,7 @@ package server
 import (
 	"net"
 	"log"
+	"log/syslog"
 	"tools/cache"
 	"tools/protocol"
 	"io"
@@ -56,9 +57,10 @@ const (
 //TODO: Tests for logger
 // Structure for managing of output information during work of server.
 type ServerLogger struct {
-	info    *log.Logger
-	warning *log.Logger
-	error   *log.Logger
+	info    	*log.Logger
+	warning 	*log.Logger
+	error   	*log.Logger
+	syslogger  	*log.Logger
 }
 
 // Initialization of information management system for server by verbosity level:
@@ -78,6 +80,8 @@ func NewServerLogger(verbosity int) *ServerLogger {
 	} else {
 		result.info = log.New(ioutil.Discard, "", 0)
 	}
+	result.syslogger, _ = syslog.NewLogger(syslog.LOG_ERR, log.Ldate | log.Ltime | log.Lshortfile)
+	result.syslogger.SetPrefix("MemoranGo ")
 	return &result
 }
 
@@ -88,11 +92,13 @@ func (l *ServerLogger) Info(args ...interface{}){
 
 // Display error-level
 func (l *ServerLogger) Error(args ...interface{}){
+	l.syslogger.Println(args)
 	l.error.Println(args)
 }
 
 // Display warning-level
 func (l *ServerLogger) Warning(args ...interface{}){
+	l.syslogger.Println(args)
 	l.warning.Println(args)
 }
 
@@ -147,17 +153,19 @@ func (server *server) run(connection_type string) {
 			if len(server.listen_address) > 0 {
 				if strings.Split(connection.RemoteAddr().String(), ":")[0] != server.listen_address {
 					server.Logger.Warning("Connection address", connection.RemoteAddr().String(), "doesn't match with", server.listen_address)
+					connection.Close()
 					continue
 				}
 			}
 			if len(server.connections) >= server.connection_limit{
 				server.Logger.Error("Impossible connect to the server. There are too much active connections right now.")
+				connection.Close()
 				continue
 			}
 			addr := connection.RemoteAddr().String()
 			if server.connections[addr] == nil {
 				server.connections[addr] = connection
-				server.Stat.Connections[addr] = stat.NewConnStat(addr)
+				server.Stat.Connections[addr] = stat.NewConnStat(connection)
 				server.Stat.Current_connections ++
 			}
 			server.Stat.Total_connections ++
@@ -202,6 +210,7 @@ func (server *server) stop() {
 // In the last case it will be return some error message to a client.
 // Anyway, at the end connection will be broken up.
 func (server *server) dispatch(address string) {
+	server.Stat.Connections[address].State = "conn_new_cmd"
 	server.ThreadSync.Add(1)
 	defer server.ThreadSync.Done()
 	connection := server.connections[address]
@@ -209,8 +218,11 @@ func (server *server) dispatch(address string) {
 	// let's loop the process for open connection, until it will get closed.
 	for {
 		// let's read a header first
+		server.Stat.Connections[address].State = "conn_read"
 		received_message, n, err := readRequest(connectionReader, -1)
+		server.Stat.Connections[address].Cmd_hit_ts = time.Now().Unix()
 		if err != nil {
+			server.Stat.Connections[address].State = "conn_swallow"
 			if err == io.EOF {
 				server.Logger.Info("Input stream has got EOF, and now is being closed.")
 				server.breakConnection(connection)
@@ -235,6 +247,7 @@ func (server *server) dispatch(address string) {
 			}
 
 			if parsed_request.DataLen() > 0 {
+				server.Stat.Connections[address].State = "conn_nread"
 				received_message, _, err := readRequest(connectionReader, parsed_request.DataLen())
 				if err != nil {
 					server.Logger.Error("Error occurred while reading data:", err)
@@ -248,6 +261,7 @@ func (server *server) dispatch(address string) {
 			server.Logger.Info("Server is sending response:\n", string(response_message[0 : len(response_message)]))
 			// if there is no flag "noreply" in the header:
 			if parsed_request.Reply() {
+				server.Stat.Connections[address].State = "conn_write"
 				server.makeResponse(connection, response_message, len(response_message))
 			}
 			if err != nil {
@@ -256,6 +270,7 @@ func (server *server) dispatch(address string) {
 				break
 			}
 		}
+		server.Stat.Connections[address].State = "conn_waiting"
 	}
 }
 
@@ -360,6 +375,7 @@ func NewServer(tcp_port string, udp_port string, address string, max_connections
 	return server
 }
 
+// Public function runs loops with all available protocols
 func (server *server) RunServer() {
 	server.sockets = make(map[string] net.Listener)
 	server.ThreadSync.Add(1)
