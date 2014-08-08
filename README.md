@@ -13,16 +13,18 @@ Installation
 * [Download](http://golang.org/dl/) and [install](http://golang.org/doc/install#install) Go compiler.
 * Clone this project, or download as zip and unpack it.
 * Open your terminal, cd to the project directory, add additional path environment for Go and build the binary file:
->> `cd /path/to/project/`   
->> `GOPATH=$GOPATH:$PWD`   
->> `go build src/memorango.go`   
-* To make sure, that whole system works fine run tests:
->> `go test src/
+> `cd /path/to/project/`   
+> `GOPATH=$GOPATH:$PWD`   
+> `go build src/memorango.go`   
+* To make sure, that whole system works fine run tests:   
+
+>`go test src/`
 
 TODO: need to remove all useless files and add test for memorango.go file.
 
-* And build documentation:
->> `godoc -http=":6060" -goroot="src/"`   
+* And build documentation:   
+
+> `godoc -http=":6060" -goroot="src/"`   
     
    That is it. Now you are ready to run MemoranGo! 
 
@@ -49,8 +51,12 @@ MemoranGo can be used with following flags:
 
 License
 -------
-License will be here
+This sofrware is under BSD License.
+See __*LICENSE*__ for more information.
 
 Contacts
 --------
-Contacts will be here
+**Author:** Konstantin Oficerov, [Crystalnix](crystalnix.com)   
+konstantin.oficerov@crystalnix.com   
+konstantin.oficerov@gmail.com   
+
