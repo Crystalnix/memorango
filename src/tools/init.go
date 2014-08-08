@@ -11,7 +11,7 @@ import (
 )
 
 // Current version string.
-const VERSION = "Go memcached implementation v1.0"
+const VERSION = "MemoranGo v1.0"
 
 // The realization of Cacheable interface.
 type StoredData struct {

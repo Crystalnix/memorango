@@ -84,9 +84,6 @@ func main() {
 									verbosity, int64(*memory_amount_mb)*1024*1024 /* let's convert to bytes */)
 		_server.RunServer()
 		defer _server.StopServer()
-//		var w sync.WaitGroup
-//		w.Add(1)
-//		w.Wait()
-		_server.ThreadSync.Wait()
+		_server.Wait()
 	}
 }

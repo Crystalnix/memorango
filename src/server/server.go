@@ -43,7 +43,7 @@ import (
 	"math/rand"
 	"time"
 	statistic "tools/stat"
-	"sync"
+	//"sync"
 	"strings"
 	"io/ioutil"
 	"tools/stat"
@@ -115,13 +115,14 @@ type Server struct {
 	connections map[string] net.Conn
 	storage *cache.LRUCache
 	Stat *statistic.ServerStat
-	ThreadSync sync.WaitGroup
+	ThreadSync chan bool
+	threads int
 	Logger *ServerLogger
 }
 
 // Private method of server structure, which starts to listen connection, cache it and delegate it to dispatcher.
 func (server *Server) run(connection_type string) {
-	defer server.ThreadSync.Done()
+	defer server.free_chan()
 	var port string
 	if connection_type == "tcp" {
 		port = server.tcp_port
@@ -169,6 +170,7 @@ func (server *Server) run(connection_type string) {
 				server.Stat.Current_connections ++
 			}
 			server.Stat.Total_connections ++
+			server.threads ++
 			go server.dispatch(connection.RemoteAddr().String())
 		}
 	}
@@ -195,11 +197,10 @@ func (server *Server) stop() {
 		server.Logger.Error("Server can't be stoped, because socket is undefined.")
 	}
 	server.Logger.Info("Waiting for ending process of goroutines...")
-	server.ThreadSync.Wait() // Waiting for all goroutines while done their jobs.
+	server.Wait()
 	server.storage.FlushAll()
 	server.storage = nil
 	server.connections = nil
-	server.Stat = nil
 }
 
 // Private method of server, which dispatches active incoming connection.
@@ -210,19 +211,21 @@ func (server *Server) stop() {
 // In the last case it will be return some error message to a client.
 // Anyway, at the end connection will be broken up.
 func (server *Server) dispatch(address string) {
+	defer server.free_chan()
 	server.Stat.Connections[address].State = "conn_new_cmd"
-	server.ThreadSync.Add(1)
-	defer server.ThreadSync.Done()
 	connection := server.connections[address]
 	connectionReader := bufio.NewReader(connection)
 	// let's loop the process for open connection, until it will get closed.
 	for {
 		// let's read a header first
-		server.Stat.Connections[address].State = "conn_read"
+		if server.Stat.Connections[address] != nil {
+			server.Stat.Connections[address].State = "conn_read"
+		}
 		received_message, n, err := readRequest(connectionReader, -1)
-		server.Stat.Connections[address].Cmd_hit_ts = time.Now().Unix()
 		if err != nil {
-			server.Stat.Connections[address].State = "conn_swallow"
+			if server.Stat.Connections[address] != nil {
+				server.Stat.Connections[address].State = "conn_swallow"
+			}
 			if err == io.EOF {
 				server.Logger.Info("Input stream has got EOF, and now is being closed.")
 				server.breakConnection(connection)
@@ -233,6 +236,7 @@ func (server *Server) dispatch(address string) {
 				break
 			}
 		} else {
+			server.Stat.Connections[address].Cmd_hit_ts = time.Now().Unix()
 			// Here the message should be handled
 			server.Stat.Read_bytes += uint64(n)
 			parsed_request := protocol.ParseProtocolHeader(string(received_message[ : n - 2]))
@@ -270,7 +274,9 @@ func (server *Server) dispatch(address string) {
 				break
 			}
 		}
-		server.Stat.Connections[address].State = "conn_waiting"
+		if server.Stat.Connections[address] != nil {
+			server.Stat.Connections[address].State = "conn_waiting"
+		}
 	}
 }
 
@@ -316,12 +322,31 @@ func readRequest(reader *bufio.Reader, length int) ([]byte, int, error){
 	}
 }
 
+// Function discards a channel and decrease counter of active channels.
+func (server *Server) free_chan(){
+	server.threads --
+	server.ThreadSync <- true
+}
+
+// Function awaits of freeing all busy channels.
+func (server *Server) Wait(){
+	for{
+		if server.threads > 0 {
+			server.Logger.Info(server.threads, "active channels at the moment. Waiting for busy goroutine.")
+			<-server.ThreadSync
+		} else {
+			break
+		}
+	}
+}
 
 // Private method break up the connection, closes it and removes it from cached server's connections.
 func (server *Server) breakConnection(connection net.Conn) bool {
 	address := connection.RemoteAddr().String()
-	server.Stat.Connections[address].State = "conn_closing"
-	defer delete(server.Stat.Connections, address)
+	if server.Stat.Connections[address] != nil {
+		server.Stat.Connections[address].State = "conn_closing"
+		defer delete(server.Stat.Connections, address)
+	}
 
 	if server.sockets == nil{
 		return false
@@ -354,7 +379,7 @@ func (server *Server) makeResponse(connection net.Conn, response_message []byte,
 // udp_port string, which uses to open tcp socket at pointed port,
 // address, which specified an only ip address which server will listen to,
 // max_connections, sets a limit of maximal number of active connections,
-// cas, flush - flags which forbid of usage such commands if value = true,
+// cas, flush - flags which forbids of usage such commands if value = true,
 // verbosity - defines the dept of verbosity for server
 // and bytes_of_memory, which uses for limiting allocated memory.
 // Function returns a pointer to a server structure with filled and prepared to usage fields.
@@ -378,10 +403,15 @@ func NewServer(tcp_port string, udp_port string, address string, max_connections
 // Public function runs loops with all available protocols
 func (server *Server) RunServer() {
 	server.sockets = make(map[string] net.Listener)
-	server.ThreadSync.Add(1)
+	if len(server.udp_port) > 0 {
+		server.ThreadSync = make(chan bool, server.connection_limit + 2) // + udp + tcp loops
+	} else {
+		server.ThreadSync = make(chan bool, server.connection_limit + 1) // + tcp loop
+	}
+	server.threads ++
 	go server.run("tcp")
 	if len(server.udp_port) > 0 {
-		server.ThreadSync.Add(1)
+		server.threads ++
 		go server.run("udp")
 	}
 }

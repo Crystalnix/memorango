@@ -16,7 +16,7 @@ var test_address = "127.0.0.1:" + test_port
 func TestServerRunAndStop(t *testing.T){
 //	var test_port = "60000"
 //	var test_address = "127.0.0.1:" + test_port
-	srv := NewServer(test_port, "", "", 1024, false, false, 0, 1024)
+	srv := NewServer(test_port, "", "", 1024, false, false, 2, 1024)
 	srv.RunServer()
 	time.Sleep(time.Millisecond * time.Duration(10)) // Let's wait a bit while goroutines will start
 	connection, err := net.Dial("tcp", test_address)
@@ -49,7 +49,7 @@ func TestServerRunAndStop(t *testing.T){
 func TestServerConsistenceAndConnections(t *testing.T){
 //	var test_port = "60001"
 //	var test_address = "127.0.0.1:" + test_port
-	srv := NewServer(test_port, "", "", 1024, false, false, 0, 1024)
+	srv := NewServer(test_port, "", "", 1024, false, false, 2, 1024)
 	srv.RunServer()
 	time.Sleep(time.Millisecond * time.Duration(10))
 	defer srv.StopServer()
@@ -80,7 +80,7 @@ func TestServerConsistenceAndConnections(t *testing.T){
 func TestServerResponseAndConnections(t *testing.T){
 //	var test_port = "60002"
 //	var test_address = "127.0.0.1:" + test_port
-	srv := NewServer(test_port, "", "", 1024, false, false, 0, 1024)
+	srv := NewServer(test_port, "", "", 1024, false, false, 2, 1024)
 	srv.RunServer()
 	time.Sleep(time.Millisecond * time.Duration(10))
 	defer srv.StopServer()
@@ -152,36 +152,5 @@ func TestServerReader2(t *testing.T){
 	res, n, err = readRequest(reader, 298)
 	if err != nil {
 		t.Fatalf("Unexpected behaviour: ", err, res, n)
-	}
-}
-
-//TODO: out of order yet.
-func TestServerLogger(t *testing.T){
-	var buf = make([]byte, 20)
-	logger := NewServerLogger(0)
-	logger.Error("errortest")
-	logger.Warning("warningtest")
-	logger.Info("infotest")
-	n, _ := os.Stdout.Read(buf)
-	if n != 0 {
-		t.Fatalf("Unexpected logger behavior", string(buf), n)
-	}
-	n, _ = os.Stderr.Read(buf)
-	if n == 0 || string(buf) != "errortest" {
-		t.Fatalf("Unexpected logger behavior", string(buf), n)
-	}
-
-	logger = NewServerLogger(1)
-	logger.Error("errortest")
-	logger.Warning("warningtest")
-	logger.Info("infotest")
-
-	n, _ = os.Stdout.Read(buf)
-	if n == 0 || string(buf) != "warningtest" {
-		t.Fatalf("Unexpected logger behavior", string(buf), n)
-	}
-	n, _ = os.Stderr.Read(buf)
-	if n == 0 || string(buf) != "errortest" {
-		t.Fatalf("Unexpected logger behavior", string(buf), n)
 	}
 }
