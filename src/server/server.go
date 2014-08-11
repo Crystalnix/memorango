@@ -81,7 +81,7 @@ type Server struct {
 	cas_disabled bool
 	flush_disabled bool
 	connection_limit int
-	sockets map[string] net.Listener
+	tcp_socket net.Listener
 	connections map[string] net.Conn
 	storage *cache.LRUCache
 	Stat *statistic.ServerStat
@@ -102,13 +102,13 @@ func (server *Server) runTCP() {
 		return
 	}
 	//var received_message []byte
-	server.sockets["tcp"] = listener
+	server.tcp_socket = listener
 	for {
-		if server.sockets == nil {
+		if server.tcp_socket == nil {
 			break
 		}
 		// Accept waits for incoming data and returns the next connection to the listener.
-		connection, err := server.sockets["tcp"].Accept()
+		connection, err := server.tcp_socket.Accept()
 		if err != nil {
 			server.Logger.Warning("Connection couldn't be accepted:", err)
 			continue
@@ -148,14 +148,18 @@ func (server *Server) stop() {
 			server.Logger.Warning("Impossible to close connection at", address)
 		}
 	}
-	if server.sockets != nil {
-		for conn_type, socket := range server.sockets {
-			err := socket.Close()
-			if err != nil {
-				server.Logger.Error("Error occured during closing " + conn_type + " socket:", err)
-			}
+	if server.tcp_socket != nil {
+//		for conn_type, socket := range server.tcp_socket {
+//			err := socket.Close()
+//			if err != nil {
+//				server.Logger.Error("Error occured during closing " + conn_type + " socket:", err)
+//			}
+//		}
+		err := server.tcp_socket.Close()
+		if err != nil {
+			server.Logger.Error("Error occured during closing " + "tcp" + " socket:", err)
 		}
-		server.sockets = nil
+		server.tcp_socket = nil
 	} else {
 		server.Logger.Error("Server can't be stoped, because socket is undefined.")
 	}
@@ -322,7 +326,7 @@ func (server *Server) breakConnection(connection net.Conn) bool {
 		defer delete(server.Stat.Connections, address)
 	}
 
-	if server.sockets == nil{
+	if server.tcp_socket == nil{
 		return false
 	}
 	delete(server.connections, connection.RemoteAddr().String())
@@ -363,7 +367,7 @@ func (server *Server) makeResponse(connection net.Conn, response_message []byte,
 func NewServer(tcp_port string, udp_port string, address string, max_connections int, cas bool, flush bool,
 	           verbosity int, bytes_of_memory int64) *Server {
 	server := new(Server)
-	server.sockets = nil
+	server.tcp_socket = nil
 	server.tcp_port = tcp_port
 	server.udp_port = udp_port
 	server.cas_disabled = cas
@@ -379,8 +383,8 @@ func NewServer(tcp_port string, udp_port string, address string, max_connections
 
 // Public function runs loops with all available protocols
 func (server *Server) RunServer() {
-	server.sockets = make(map[string] net.Listener)
-	var additional_threads = 0
+//	server.sockets = make(map[string] net.Listener)
+	var additional_threads = 1 // for tcp
 //	if len(server.udp_port) > 0 {
 //		additional_threads ++
 //	}

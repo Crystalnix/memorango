@@ -12,7 +12,7 @@ Installation
 ------------
 * [Download](http://golang.org/dl/) and [install](http://golang.org/doc/install#install) Go compiler.
 * Clone this project, or download as zip and unpack it.
-* Open your terminal, cd to the project directory, add additional path environment for Go and build the binary file:
+* Open your terminal, cd to the project directory, add additional path environment for Go and build the binary file:   
 > `cd /path/to/project/`   
 > `GOPATH=$GOPATH:$PWD`   
 > `go build src/memorango.go`   
@@ -56,7 +56,7 @@ See __*LICENSE*__ for more information.
 
 Contacts
 --------
-**Author:** Konstantin Oficerov, [Crystalnix](crystalnix.com)   
+**Author:** Konstantin Oficerov, [Crystalnix](http://crystalnix.com)   
 konstantin.oficerov@crystalnix.com   
 konstantin.oficerov@gmail.com   
 
