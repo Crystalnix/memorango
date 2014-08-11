@@ -3,6 +3,7 @@ package cache
 import (
 	"testing"
 	"tools"
+	"time"
 )
 
 func TestCacheCreationSuite1(t *testing.T){
@@ -160,5 +161,87 @@ func TestCacheSetCasSuite(t *testing.T){
 	}
 	if cache.Get("key").Cas_unique != 424242 {
 		t.Fatalf("Cas unique wasn't set")
+	}
+}
+
+func TestOldestItem(t *testing.T){
+	cache := New(42)
+	cache.Set(tools.NewStoredData([]byte("NOTOLD"), "key1"), 0, 0, 0)
+	cache.Set(tools.NewStoredData([]byte("TEST"), "key2"), 0, 0, 0)
+	cache.Set(tools.NewStoredData([]byte("OLD"), "key3"), 0, 0, 0)
+	cache.Get("key1")
+	cache.Get("key2")
+	ts := cache.Oldest()
+	if ts != cache.Get("key3").ts {
+		t.Fatalf("Unexpected oldest value; expected timestamp %d, received %d", cache.Get("key3").ts, ts)
+	}
+}
+
+func TestCrawlerInitialization(t *testing.T){
+	cache := New(42)
+	if cache.Crawler == nil || cache.Crawler.enabled || cache.Crawler.sleep_period != 0 || cache.Crawler.ItemsPerRun != 0 {
+		t.Fatalf("Unexpected initialization of crawler: ", cache.Crawler)
+	}
+}
+
+func TestCrawlerEnablingDisabling(t *testing.T){
+	cache := New(42)
+	crawler := cache.Crawler
+	err := cache.EnableCrawler()
+	time.Sleep(time.Millisecond)
+	if crawler.enabled || err == nil {
+		t.Fatalf("Crawler enabled meanwhile items per run wasn't specified.")
+	}
+	crawler.ItemsPerRun = 10
+	cache.Set(tools.NewStoredData([]byte("TEST"), "test"), 0, 0, 0)
+	err = cache.EnableCrawler()
+	time.Sleep(time.Millisecond)
+	if !crawler.enabled || err != nil {
+		t.Fatalf("Unexpected behavior: crawler is disabled.", err)
+	}
+	cache.DisableCrawler()
+	if crawler.enabled {
+		t.Fatalf("Unexpected behavior: crawler still runing.")
+	}
+}
+
+func TestCrawlerSetSleep(t *testing.T){
+	cache := New(42)
+	crawler := cache.Crawler
+	err := crawler.SetSleep(100)
+	if crawler.sleep_period != 100 || err != nil {
+		t.Fatalf("Unexpected value: %d", crawler.sleep_period, err)
+	}
+	err = crawler.SetSleep(0)
+	if crawler.sleep_period != 0 || err != nil {
+		t.Fatalf("Unexpected value: %d", crawler.sleep_period, err)
+	}
+	err = crawler.SetSleep(MAX_SLEEP_TIME + 1)
+	if err == nil {
+		t.Fatalf("Unexpected value: %d", crawler.sleep_period)
+	}
+}
+
+func TestCrawlerExpiring(t *testing.T){
+	cache := New(4242)
+	crawler := cache.Crawler
+	if crawler.SetSleep(10) != nil {
+		t.Fatalf("Unexpected behavior")
+	}
+	crawler.ItemsPerRun = 10
+	for i := 0; i < 100; i ++ {
+		cache.Set(tools.NewStoredData([]byte("TEST"), "key" + string(byte(i))), 0, 424242, 0)
+	}
+	for i := 0; i < 50; i ++ {
+		cache.Set(tools.NewStoredData([]byte("TEST"), "1key" + string(byte(i))), 0, 4242424242, 0)
+	}
+	err := cache.EnableCrawler()
+	if err != nil {
+		t.Fatalf("Unexpected behavior: crawler is disabled.", err)
+	}
+	time.Sleep(time.Millisecond * time.Duration(100))
+	end_len := cache.list.Len()
+	if end_len != 50 {
+		t.Fatalf("Unexpected crawler's behavior: cache has %d items.", end_len)
 	}
 }

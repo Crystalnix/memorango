@@ -1,5 +1,5 @@
 /*
-Package implements LRU cache data structure.
+Package implements LRU cache data structure, its statistic and crawler.
 */
 package cache
 
@@ -23,6 +23,7 @@ type LRUCacheItem struct {
 	Cas_unique int64
 	listElement *list.Element
 	touched bool
+	ts int64
 }
 
 // Structure for storage statistics.
@@ -33,6 +34,8 @@ type LRUCacheStat struct {
 	Evicted_unfetched uint64
 	Current_items int
 	Total_items int64
+	Crawler_reclaimed int64
+	Outofmem int64
 }
 
 // Implementation of LRUCache itself.
@@ -42,6 +45,7 @@ type LRUCache struct {
 	items map[string] *LRUCacheItem
 	list *list.List
 	Stats *LRUCacheStat
+	Crawler *LRUCrawler
 }
 
 // Private method of LRUCache for promoting item to the top of list.
@@ -52,8 +56,8 @@ func (c *LRUCache) promote(item *LRUCacheItem) {
 
 // Private method of LRUCache for releasing of memory.
 // Function receives amount of items to dispose. These items will be discarded from the tail of list.
+// Amount == -1 - flushes all.
 func (c *LRUCache) prune(amount int) {
-	// -1 flushes all
 	var counter = 0
 	for{
 		if amount != -1 && counter == amount { return }
@@ -97,19 +101,21 @@ func (c *LRUCache) Get(key string) *LRUCacheItem {
 // Function returns true if item was stored or false if there was no space for it.
 func (c *LRUCache) Set(Cacheable Cacheable, flags int, expiration_ts int64, cas_unique int64) bool {
 	if c.capacity < int64(Cacheable.Size()) {
+		c.Stats.Outofmem ++
 		c.prune(50)
 	}
-
 	//still not enough room, fail
 	if c.capacity < int64(Cacheable.Size()) {
 		return false
 	}
 	item, exists := c.items[Cacheable.Key()]
 	if exists {
+		old_size := item.Cacheable.Size()
 		item.Cacheable = Cacheable
 		item.Cas_unique = cas_unique
 		item.Flags = flags
 		item.Exptime = expiration_ts
+		c.capacity -= int64(Cacheable.Size() - old_size)
 		c.promote(item)
 	} else {
 		item = &LRUCacheItem{
@@ -118,6 +124,7 @@ func (c *LRUCache) Set(Cacheable Cacheable, flags int, expiration_ts int64, cas_
 			Exptime: expiration_ts,
 			Cas_unique: cas_unique,
 			touched: false,
+			ts: time.Now().Unix(),
 		}
 		item.listElement = c.list.PushFront(item)
 		c.items[Cacheable.Key()] = item
@@ -158,7 +165,6 @@ func (c *LRUCache) SetCas(key string, cas int64) bool {
 }
 
 // Getter for private capacity param
-// TODO: Test for this
 func (c *LRUCache) Capacity() int64 {
 	return c.capacity
 }
@@ -168,11 +174,12 @@ func (c *LRUCache) Capacity() int64 {
 // Function returns pointer to created instance or nil if capacity is invalid.
 func New(capacity int64 /* bytes */) *LRUCache {
 	if capacity <= 0 { return nil }
-	return &LRUCache{
+	return &LRUCache {
 		capacity: capacity,
 		items: make(map[string] *LRUCacheItem, 10000),
 		list: list.New(),
-		Stats: &LRUCacheStat{capacity, 0, 0, 0, 0, 0},
+		Stats: &LRUCacheStat{capacity, 0, 0, 0, 0, 0, 0, 0},
+		Crawler: NewCrawler(),
 	}
 }
 
@@ -193,4 +200,12 @@ func (c *LRUCache) deleteExpired(Cacheable Cacheable) bool {
 		}
 	}
 	return false
+}
+
+// Function returns a timestamp of oldest stored item.
+func (s *LRUCache) Oldest() int64 {
+	if s.list.Back() == nil {
+		return time.Now().Unix()
+	}
+	return s.list.Back().Value.(*LRUCacheItem).ts
 }

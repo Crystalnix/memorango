@@ -1,3 +1,7 @@
+/*
+This package supposed to keeping statistics for different part of system, such as server's core, connections, storage(cache), and therefore, for displaying of it.
+*/
+
 package stat
 
 import (
@@ -7,6 +11,7 @@ import (
 	"runtime"
 	"tools/cache"
 	"tools"
+	"net"
 )
 
 const (
@@ -19,19 +24,54 @@ type ServerStat struct {
 	pid int
 	init_ts int64
 	limit_maxbytes int64
+	verbosity int
+	tcp string
+	udp string
+	cas_disabled bool
+	flush_disabled bool
+	Connections map[string] *ConnectionStat
 	Current_connections uint32
 	Total_connections uint32
+	Connections_limit int
 	Read_bytes uint64
 	Written_bytes uint64
 	Commands map[string] uint64
 }
 
+// Structure for logging statistics for connections bound with server.
+type ConnectionStat struct {
+	State string
+	//The number of seconds since the most recently
+	//issued command on the connection. This measures
+	//the time since the start of the command, so if
+	//"state" indicates a command is currently executing,
+	//this will be the number of seconds the current
+	//command has been running.
+	//state string
+	Cmd_hit_ts int64
+	//The current state of the connection.
+	Addr string
+	//The address of the remote side. For listening
+	//sockets this is the listen address. Note that some
+	//socket types (such as UNIX-domain) don't have
+	//meaningful remote addresses.
+}
+
+
 // Function initialize ServerStat structure by required start parameters.
-func New(memory_amount int64) *ServerStat {
-	return &ServerStat{
+func New(memory_amount int64, tcp_port string, udp_port string,
+	     conn_max int, verbosity int, cas_disabled bool, flush_disabled bool) *ServerStat {
+	return &ServerStat {
 		pid: os.Getpid(),
 		init_ts: time.Now().Unix(),
 		limit_maxbytes: memory_amount,
+		tcp: tcp_port,
+		udp: udp_port,
+		verbosity: verbosity,
+		cas_disabled: cas_disabled,
+		flush_disabled: flush_disabled,
+		Connections: make(map[string] *ConnectionStat),
+		Connections_limit: conn_max,
 		Current_connections: 0,
 		Total_connections: 0,
 		Read_bytes: 0,
@@ -70,11 +110,6 @@ func (s *ServerStat) bytes(capacity int64) int64 {
 	return int64(s.limit_maxbytes) - capacity
 }
 
-// Function returns number of active goroutines for current process
-func (s *ServerStat) threads() int {
-	return runtime.NumGoroutine()
-}
-
 // Function serialize statistic of server and storage and returns it as map of strings
 func (s *ServerStat) Serialize(storage *cache.LRUCache) map[string] string {
 	dict := make(map[string] string)
@@ -96,9 +131,72 @@ func (s *ServerStat) Serialize(storage *cache.LRUCache) map[string] string {
 	dict["evicted_unfetched"] = tools.IntToString(int64(storage.Stats.Evicted_unfetched))
 	dict["bytes_read"] = tools.IntToString(int64(s.Read_bytes))
 	dict["bytes_written"] = tools.IntToString(int64(s.Written_bytes))
-	dict["threads"] = tools.IntToString(int64(s.threads()))
+	dict["goroutines"] = tools.IntToString(int64(runtime.NumGoroutine()))
+	dict["crawler_reclaimed"] = tools.IntToString(storage.Stats.Crawler_reclaimed)
 	for key, value := range s.Commands {
 		dict[key] = tools.IntToString(int64(value))
 	}
+	return dict
+}
+
+// Function serialize sub command of stats "settings"
+func (s *ServerStat) Settings(storage *cache.LRUCache) map[string] string {
+	dict := make(map[string] string)
+	dict["maxbytes"] = tools.IntToString(storage.Capacity())
+	dict["maxconns"] = tools.IntToString(int64(s.Connections_limit))
+	dict["tcpport"] = s.tcp
+	dict["udpport"] = s.udp
+	dict["verbosity"] = tools.IntToString(int64(s.verbosity))
+	dict["num_goroutines"] = tools.IntToString(int64(runtime.NumGoroutine()))
+	dict["evictions"] = "on" //TODO: to think about apportunity of another value.
+	if storage.Crawler.Enabled() {
+		dict["lru_crawler"] = "true"
+	} else {
+		dict["lru_crawler"] = "false"
+	}
+	dict["lru_crawler_sleep"] = tools.IntToString(int64(storage.Crawler.Sleep()))
+	dict["lru_crawler_tocrawl"] = tools.IntToString(int64(storage.Crawler.ItemsPerRun))
+	if s.cas_disabled {
+		dict["cas_enabled"] = "false"
+	} else {
+		dict["cas_enabled"] = "true"
+	}
+	if s.flush_disabled {
+		dict["flush_all_enabled"] = "false"
+	} else {
+		dict["flush_all_enabled"] = "true"
+	}
+	return dict
+}
+
+
+// Function serialize sub command of stats "conns"
+func (s *ServerStat) Conns() []string {
+	var arr []string
+	for _, value := range s.Connections {
+		arr = append(arr, "<NULL>:addr " + value.Addr,  "<NULL>:state " + value.State,
+				     "<NULL>:secs_since_last_cmd " + tools.IntToString(time.Now().Unix() - value.Cmd_hit_ts))
+	}
+	return arr
+}
+
+// Constructor for connection statistic
+func NewConnStat(connection net.Conn) *ConnectionStat {
+	return &ConnectionStat {
+		State: "conn_waiting",
+		Cmd_hit_ts: time.Now().Unix(),
+		Addr: connection.RemoteAddr().Network() + "[" + connection.RemoteAddr().String() + "]",
+	}
+}
+
+// Serialization of sub command items
+func (s *ServerStat) Items(storage *cache.LRUCache) map[string] string {
+	dict := make(map[string] string)
+	dict["number"] = tools.IntToString(int64(storage.Stats.Current_items))
+	dict["age"] = tools.IntToString(time.Now().Unix() - storage.Oldest())
+	dict["expired_unfetched"] = tools.IntToString(int64(storage.Stats.Expired_unfetched))
+	dict["evicted_unfetched"] = tools.IntToString(int64(storage.Stats.Evicted_unfetched))
+	dict["crawler_reclaimed"] = tools.IntToString(storage.Stats.Crawler_reclaimed)
+	dict["outofmemory"] = tools.IntToString(storage.Stats.Outofmem)
 	return dict
 }
