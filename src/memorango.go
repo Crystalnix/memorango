@@ -71,15 +71,15 @@ func main() {
 			transacted_options = append(transacted_options, "-vv")
 		}
 		transacted_options = append(transacted_options, "&")
-		fmt.Printf("Run MemoranGo daemon at 127.0.0.1:%s with %d MiB allowed memory.\n", *tcp_port, *memory_amount_mb)
+		fmt.Printf("Run %s daemon at 127.0.0.1:%s with %d MiB allowed memory.\n", tools.VERSION, *tcp_port, *memory_amount_mb)
 		cmd := exec.Command("/usr/bin/nohup", transacted_options...)
 		start_err := cmd.Start()
 		if start_err != nil {
 			fmt.Println("Status: ", start_err)
 		}
 	} else {
-		fmt.Printf("%d Run MemoranGo on 127.0.0.1:%s with %d MiB allowed memory.\n",
-			os.Getpid(), *tcp_port, *memory_amount_mb)
+		fmt.Printf("%d Run %s on 127.0.0.1:%s with %d MiB allowed memory.\n",
+			os.Getpid(), tools.VERSION, *tcp_port, *memory_amount_mb)
 		_server := server.NewServer(*tcp_port, *udp_port, *listen_ip, *max_connections, *disable_cas, *disable_flush,
 									verbosity, int64(*memory_amount_mb)*1024*1024 /* let's convert to bytes */)
 		_server.RunServer()

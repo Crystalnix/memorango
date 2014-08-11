@@ -1,0 +1,187 @@
+ This document is part of https://github.com/memcached/memcached/blob/master/doc/protocol.txt
+ Here are marks of implemented statistics fields.
+ With sign '?' marked props, which are impossible / useless / out of context into Go reimplemetation,
+ but possibly will be somehow implemented in future.
+
+
+ ============================= With no args =========================================
+|=======================|=========|===========================================|======
+| pid                   | 32u     | Process id of this server process         | + k
+| uptime                | 32u     | Number of secs since the server started   | +- k
+| time                  | 32u     | current UNIX time according to the server | +- k
+| version               | string  | Version string of this server             | +- k
+| pointer_size          | 32      | Default size of pointers on the host OS   | +- k
+|                       |         | (generally 32 or 64)                      |
+| rusage_user           | 32u.32u | Accumulated user time for this process    | - k
+|                       |         | (seconds:microseconds)                    |
+| rusage_system         | 32u.32u | Accumulated system time for this process  | - k
+|                       |         | (seconds:microseconds)                    |
+| curr_items            | 32u     | Current number of items stored            | + k
+| total_items           | 32u     | Total number of items stored since        | + k
+|                       |         | the server started                        |
+| bytes                 | 64u     | Current number of bytes used              | - k
+|                       |         | to store items                            |
+| curr_connections      | 32u     | Number of open connections                | + k
+| total_connections     | 32u     | Total number of connections opened since  | + k
+|                       |         | the server started running                |
+| connection_structures | 32u     | Number of connection structures allocated | ?
+|                       |         | by the server                             |
+| reserved_fds          | 32u     | Number of misc fds used internally        | ?
+| cmd_get               | 64u     | Cumulative number of retrieval reqs       | + k
+| cmd_set               | 64u     | Cumulative number of storage reqs         | + k
+| cmd_flush             | 64u     | Cumulative number of flush reqs           | +k
+| cmd_touch             | 64u     | Cumulative number of touch reqs           | +k
+| get_hits              | 64u     | Number of keys that have been requested   | +k
+|                       |         | and found present                         |
+| get_misses            | 64u     | Number of items that have been requested  | +k
+|                       |         | and not found                             |
+| delete_misses         | 64u     | Number of deletions reqs for missing keys | +k
+| delete_hits           | 64u     | Number of deletion reqs resulting in      | +k
+|                       |         | an item being removed.                    |
+| incr_misses           | 64u     | Number of incr reqs against missing keys. | +k
+| incr_hits             | 64u     | Number of successful incr reqs.           | +k
+| decr_misses           | 64u     | Number of decr reqs against missing keys. | +k
+| decr_hits             | 64u     | Number of successful decr reqs.           | +k
+| cas_misses            | 64u     | Number of CAS reqs against missing keys.  | +k
+| cas_hits              | 64u     | Number of successful CAS reqs.            | +k
+| cas_badval            | 64u     | Number of CAS reqs for which a key was    | +k
+|                       |         | found, but the CAS value did not match.   |
+| touch_hits            | 64u     | Numer of keys that have been touched with | +k
+|                       |         | a new expiration time                     |
+| touch_misses          | 64u     | Numer of items that have been touched and | +k
+|                       |         | not found                                 |
+| auth_cmds             | 64u     | Number of authentication commands         | ?
+|                       |         | handled, success or failure.              |
+| auth_errors           | 64u     | Number of failed authentications.         | ?
+| evictions             | 64u     | Number of valid items removed from cache  | +- k
+|                       |         | to free memory for new items              |
+| reclaimed             | 64u     | Number of times an entry was stored using | ? for wht
+|                       |         | memory from an expired entry              |
+| bytes_read            | 64u     | Total number of bytes read by this server | + k
+|                       |         | from network                              |
+| bytes_written         | 64u     | Total number of bytes sent by this server | + k
+|                       |         | to network                                |
+| limit_maxbytes        | 32u     | Number of bytes this server is allowed to | + k
+|                       |         | use for storage.                          |
+| threads               | 32u     | Number of worker threads requested.       | +- k
+|                       |         | (see doc/threads.txt)                     |
+| conn_yields           | 64u     | Number of times any connection yielded to | ?
+|                       |         | another due to hitting the -R limit.      |
+| hash_power_level      | 32u     | Current size multiplier for hash table    | ?
+| hash_bytes            | 64u     | Bytes currently used by hash tables       | ?
+| hash_is_expanding     | bool    | Indicates if the hash table is being      | ?
+|                       |         | grown to a new size                       |
+| expired_unfetched     | 64u     | Items pulled from LRU that were never     | +- k
+|                       |         | touched by get/incr/append/etc before     |
+|                       |         | expiring                                  |
+| evicted_unfetched     | 64u     | Items evicted from LRU that were never    | +- k
+|                       |         | touched by get/incr/append/etc.           |
+| slab_reassign_running | bool    | If a slab page is being moved             | ?
+| slabs_moved           | 64u     | Total slab pages moved                    | ?
+| crawler_reclaimed     | 64u     | Total items freed by LRU Crawler          | - k
+|=======================|=========|===========================================|======
+
+ ================================== Settings =======================================
+
+|===================|==========|==============================================|======
+| maxbytes          | size_t   | Maximum number of bytes allows in this cache | + k
+| maxconns          | 32       | Maximum number of clients allowed.           | + k
+| tcpport           | 32       | TCP listen port.                             | + k
+| udpport           | 32       | UDP listen port.                             | + k
+| inter             | string   | Listen interface.                            | -
+| verbosity         | 32       | 0 = none, 1 = some, 2 = lots                 | + k
+| oldest            | 32u      | Age of the oldest honored object.            | -+
+| evictions         | on/off   | When off, LRU evictions are disabled.        | always on
+| domain_socket     | string   | Path to the domain socket (if any).          | -+
+| umask             | 32 (oct) | umask for the creation of the domain socket. | ?
+| growth_factor     | float    | Chunk size growth factor.                    | -
+| chunk_size        | 32       | Minimum space allocated for key+value+flags. | -
+| num_threads       | 32       | Number of threads (including dispatch).      | goroutines k
+| stat_key_prefix   | char     | Stats prefix separator character.            | ?
+| detail_enabled    | bool     | If yes, stats detail is enabled.             | ?
+| reqs_per_event    | 32       | Max num IO ops processed within an event.    | -
+| cas_enabled       | bool     | When no, CAS is not enabled for this server. | +
+| tcp_backlog       | 32       | TCP listen backlog.                          | ? mb +
+| auth_enabled_sasl | yes/no   | SASL auth requested and enabled.             | always no - for now
+| item_size_max     | size_t   | maximum item size                            | -?
+| maxconns_fast     | bool     | If fast disconnects are enabled              | ?
+| hashpower_init    | 32       | Starting size multiplier for hash table      | -
+| slab_reassign     | bool     | Whether slab page reassignment is allowed    | -
+| slab_automove     | bool     | Whether slab page automover is enabled       | -
+| hash_algorithm    | char     | Hash table algorithm in use                  | ?
+| lru_crawler       | bool     | Whether the LRU crawler is enabled           | + k
+| lru_crawler_sleep | 32       | Microseconds to sleep between LRU crawls     | + k
+|lru_crawler_tocrawl| 32u      | Max items to crawl per slab per run          | + k
+|===================|==========|==============================================|======
+
+ ================================== Items ==========================================
+
+The following item values are defined as of writing.
+|Name                   |Meaning
+|-----------------------|------------------------------------------------------------
+|number              k +|Number of items presently stored in this class. Expired
+|                       |items are not automatically excluded.
+|age                 k +|Age of the oldest item in the LRU.
+|evicted                |Number of times an item had to be evicted from the LRU
+|                       |before it expired.
+|                       |
+|evicted_nonzero       ?|Number of times an item which had an explicit expire
+|                       | time set had to be evicted from the LRU before it
+|                       |expired.
+|evicted_time          -| Seconds since the last access for the most recent item
+|                       | evicted from this class. Use this to judge how
+|                       | recently active your evicted data is.
+|outofmemory           +| Number of times the underlying slab class was unable to
+|                       | store a new item. This means you are running with -M or
+|                       | an eviction failed.
+|tailrepairs           -| Number of times we self-healed a slab with a refcount
+|                       |leak. If this counter is increasing a lot, please
+|                       |report your situation to the developers.
+|reclaimed             -|Number of times an entry was stored using memory from
+|                       |an expired entry.
+|expired_unfetched   k +|Number of expired items reclaimed from the LRU which
+|                       |were never touched after being set.
+|evicted_unfetched   k +|Number of valid items evicted from the LRU which were
+|                       |never touched after being set.
+|crawler_reclaimed   k +|Number of items freed by the LRU Crawler.
+|-----------------------|------------------------------------------------------------
+
+ ================================== Conns ==========================================
+
+The following "stat" keywords may be present:
+|---------------------+------------------------------------------------------|
+| Name                | Meaning                                              |
+|---------------------+------------------------------------------------------|
+| addr                | The address of the remote side. For listening        | +
+|                     | sockets this is the listen address. Note that some   |
+|                     | socket types (such as UNIX-domain) don't have        |
+|                     | meaningful remote addresses.                         |
+| state               | The current state of the connection. See below.      | +
+| secs_since_last_cmd | The number of seconds since the most recently        | +
+|                     | issued command on the connection. This measures      |
+|                     | the time since the start of the command, so if       |
+|                     | "state" indicates a command is currently executing,  |
+|                     | this will be the number of seconds the current       |
+|                     | command has been running.                            |
+|---------------------+------------------------------------------------------|
+The value of the "state" stat may be one of the following:
+|----------------+-----------------------------------------------------------|
+| Name           | Meaning                                                   |
+|----------------+-----------------------------------------------------------|
+| conn_closing   | Shutting down the connection.                             |
+| conn_listening | Listening for new connections or a new UDP request.       |
+| conn_mwrite    | Writing a complex response, e.g., to a "get" command.     |
+| conn_new_cmd   | Connection is being prepared to accept a new command.     |
+| conn_nread     | Reading extended data, typically for a command such as    |
+|                | "set" or "put".                                           |
+| conn_parse_cmd | The server has received a command and is in the middle    |
+|                | of parsing it or executing it.                            |
+| conn_read      | Reading newly-arrived command data.                       |
+| conn_swallow   | Discarding excess input, e.g., after an error has         |
+|                | occurred.                                                 |
+| conn_waiting   | A partial command has been received and the server is     |
+|                | waiting for the rest of it to arrive (note the difference |
+|                | between this and conn_nread).                             |
+| conn_write     | Writing a simple response (anything that doesn't involve  |
+|                | sending back multiple lines of response data).            |
+|----------------+-----------------------------------------------------------|

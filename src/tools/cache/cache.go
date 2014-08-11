@@ -1,5 +1,5 @@
 /*
-Package implements LRU cache data structure.
+Package implements LRU cache data structure, its statistic and crawler.
 */
 package cache
 
@@ -202,7 +202,6 @@ func (c *LRUCache) deleteExpired(Cacheable Cacheable) bool {
 	return false
 }
 
-//TODO: Tests for functionality below.
 // Function returns a timestamp of oldest stored item.
 func (s *LRUCache) Oldest() int64 {
 	if s.list.Back() == nil {

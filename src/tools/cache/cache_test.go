@@ -164,6 +164,19 @@ func TestCacheSetCasSuite(t *testing.T){
 	}
 }
 
+func TestOldestItem(t *testing.T){
+	cache := New(42)
+	cache.Set(tools.NewStoredData([]byte("NOTOLD"), "key1"), 0, 0, 0)
+	cache.Set(tools.NewStoredData([]byte("TEST"), "key2"), 0, 0, 0)
+	cache.Set(tools.NewStoredData([]byte("OLD"), "key3"), 0, 0, 0)
+	cache.Get("key1")
+	cache.Get("key2")
+	ts := cache.Oldest()
+	if ts != cache.Get("key3").ts {
+		t.Fatalf("Unexpected oldest value; expected timestamp %d, received %d", cache.Get("key3").ts, ts)
+	}
+}
+
 func TestCrawlerInitialization(t *testing.T){
 	cache := New(42)
 	if cache.Crawler == nil || cache.Crawler.enabled || cache.Crawler.sleep_period != 0 || cache.Crawler.ItemsPerRun != 0 {

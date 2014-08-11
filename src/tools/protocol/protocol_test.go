@@ -690,7 +690,7 @@ func TestHandlingSuiteQuit(t *testing.T){
 
 func TestHandlingStatistic(t *testing.T){
 	var testEnum = Ascii_protocol_enum{"stats", nil, 0, 0, 0, 0, false, nil, ""}
-	var stats = stat.New(42)
+	var stats = stat.New(42, "9999", "8888", 1024, 2, true, true)
 	var storage = cache.New(42)
 
 	res, err := testEnum.HandleRequest(storage, stats)
@@ -701,7 +701,7 @@ func TestHandlingStatistic(t *testing.T){
 
 func TestHandlingStatsRecording(t *testing.T){
 	var testEnum = Ascii_protocol_enum{"set", []string{"key", }, 1, 0, 2, 0, true, []byte("42"), ""}
-	var stats = stat.New(42)
+	stats := stat.New(42, "9999", "8888", 1024, 2, true, true)
 	var storage = cache.New(42)
 	res, err := testEnum.HandleRequest(storage, stats)
 	if err != nil || res == nil {
@@ -711,7 +711,7 @@ func TestHandlingStatsRecording(t *testing.T){
 		t.Fatalf("Wrong stats handling: ", stats.Commands)
 	}
 
-	stats = stat.New(42)
+	stats = stat.New(42, "9999", "8888", 1024, 2, true, true)
 	testEnum = Ascii_protocol_enum{"get", []string{"not_key", }, 0, 0, 0, 0, false, nil, ""}
 	res, err = testEnum.HandleRequest(storage, stats)
 	if err != nil || res == nil {
@@ -721,7 +721,7 @@ func TestHandlingStatsRecording(t *testing.T){
 		t.Fatalf("Wrong stats handling: ", stats.Commands)
 	}
 
-	stats = stat.New(42)
+	stats = stat.New(42, "9999", "8888", 1024, 2, true, true)
 	testEnum = Ascii_protocol_enum{"get", []string{"key", }, 0, 0, 0, 0, false, nil, ""}
 	res, err = testEnum.HandleRequest(storage, stats)
 	if err != nil || res == nil {
@@ -731,7 +731,7 @@ func TestHandlingStatsRecording(t *testing.T){
 		t.Fatalf("Wrong stats handling: ", stats.Commands)
 	}
 
-	stats = stat.New(42)
+	stats = stat.New(42, "9999", "8888", 1024, 2, true, true)
 	testEnum = Ascii_protocol_enum{"cas", []string{"key", }, 1, 0, 42, 424242, false, make([]byte, 42), ""}
 	res, err = testEnum.HandleRequest(storage, stats)
 	if err != nil || res == nil {

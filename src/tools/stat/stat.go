@@ -1,3 +1,7 @@
+/*
+This package supposed to keeping statistics for different part of system, such as server's core, connections, storage(cache), and therefore, for displaying of it.
+*/
+
 package stat
 
 import (
@@ -165,7 +169,7 @@ func (s *ServerStat) Settings(storage *cache.LRUCache) map[string] string {
 	return dict
 }
 
-//TODO: test for functionality below
+
 // Function serialize sub command of stats "conns"
 func (s *ServerStat) Conns() []string {
 	var arr []string
